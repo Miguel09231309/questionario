@@ -1,21 +1,1591 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gestão Escolar - Questionário de Salas & Turmas</title>
-    <meta name="description" content="Sistema escolar completo para diretores cadastrarem perguntas sobre salas e turmas e professores responderem, com banco de dados IndexedDB." />
-    <meta property="og:title" content="Gestão Escolar - Questionário de Salas & Turmas" />
-    <meta property="og:description" content="Sistema escolar completo para diretores cadastrarem perguntas sobre salas e turmas e professores responderem, com banco de dados IndexedDB." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-slate-50 text-slate-900 font-sans antialiased selection:bg-indigo-100 selection:text-indigo-900">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão Escolar - Questionário de Salas & Turmas</title>
+  <meta name="description" content="Sistema escolar completo para diretores cadastrarem perguntas sobre salas e turmas e professores responderem, com banco de dados IndexedDB e funcionamento 100% autônomo.">
+  <meta property="og:title" content="Gestão Escolar - Questionário de Salas & Turmas">
+  <meta property="og:description" content="Sistema escolar completo com login de diretor e professor, perguntas sobre salas e alunos, formulário em caixas e análise de desempenho.">
+  <meta property="og:type" content="website">
 
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS via CDN com fallback -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons via CDN com fallback seguro -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    if (window.tailwind) {
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            colors: {
+              brand: {
+                50: '#eef2ff',
+                100: '#e0e7ff',
+                500: '#6366f1',
+                600: '#4f46e5',
+                700: '#4338ca',
+                800: '#3730a3',
+                900: '#312e81',
+              }
+            }
+          }
+        }
+      };
+    }
+  </script>
+
+  <style>
+    /* Estilos essenciais e transições dos botões em caixas */
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+
+    .btn-caixa {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+    .btn-caixa:hover {
+      transform: translateY(-1px);
+    }
+    .btn-caixa:active {
+      transform: translateY(0);
+    }
+
+    /* Cores das caixas selecionadas */
+    .btn-caixa.active-otimo {
+      background-color: #10b981 !important;
+      border-color: #059669 !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
+    .btn-caixa.active-bom {
+      background-color: #0284c7 !important;
+      border-color: #0369a1 !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+    }
+    .btn-caixa.active-regular {
+      background-color: #f59e0b !important;
+      border-color: #d97706 !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+    }
+    .btn-caixa.active-ruim {
+      background-color: #ef4444 !important;
+      border-color: #dc2626 !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+    }
+
+    .btn-caixa.active-otimo span,
+    .btn-caixa.active-bom span,
+    .btn-caixa.active-regular span,
+    .btn-caixa.active-ruim span {
+      color: #ffffff !important;
+    }
+
+    /* Fallback caso Tailwind CDN demore para carregar */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .grid { display: grid; }
+    .block { display: block; }
+    .inline-block { display: inline-block; }
+    .inline-flex { display: inline-flex; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen flex flex-col selection:bg-indigo-100 selection:text-indigo-900">
+
+  <!-- ============================================================== -->
+  <!-- CABEÇALHO GLOBAL                                               -->
+  <!-- ============================================================== -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
+        </div>
+        <div>
+          <span class="text-base sm:text-lg font-bold tracking-tight text-slate-900 block leading-tight">
+            Colégio Saber Ativo
+          </span>
+          <span class="text-xs text-slate-500 font-medium hidden sm:block">
+            Portal de Gestão &bull; Questionário de Salas, Turmas & Alunos
+          </span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3" id="headerUserZone">
+        <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="dbStatusLabel">Banco Local Pronto</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================== -->
+  <!-- CONTEÚDO PRINCIPAL                                             -->
+  <!-- ============================================================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+
+    <!-- ============================================================== -->
+    <!-- TELA 1: LOGIN (PRIMEIRA ABA: DIRETOR OU PROFESSOR)             -->
+    <!-- ============================================================== -->
+    <div id="viewLogin" class="max-w-4xl mx-auto">
+      <div class="text-center mb-8">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-indigo-700 mb-3">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          Sistema Autônomo &bull; Funciona Direto no Navegador & GitHub Pages
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          Acesso ao Questionário Escolar
+        </h1>
+        <p class="text-sm text-slate-600 mt-2 max-w-lg mx-auto">
+          Escolha seu perfil abaixo: <strong>Diretor</strong> (para cadastrar e excluir perguntas sobre as turmas e salas) ou <strong>Professor</strong> (para responder às avaliações e ver o desempenho).
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Card Perfil Diretor -->
+        <div class="bg-white border-2 border-slate-200 hover:border-indigo-500 rounded-2xl p-6 sm:p-7 transition-all shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+              </div>
+              <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md">
+                Gestão & Coordenação
+              </span>
+            </div>
+            <h2 class="text-lg font-bold text-slate-900 mb-1">Diretor(a) Escolar</h2>
+            <p class="text-xs sm:text-sm text-slate-600 mb-4 leading-relaxed">
+              Área do Diretor: cadastre novas perguntas para os professores, exclua perguntas existentes, gerencie turmas e salas e exporte relatórios consolidados.
+            </p>
+            <ul class="text-xs text-slate-600 space-y-1.5 mb-6">
+              <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+                Cadastrar perguntas sobre salas, turmas e alunos
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+                Excluir perguntas e configurar formatos (caixas, sim/não, texto)
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+                Exportar respostas para planilha Excel/CSV e Backup JSON
+              </li>
+            </ul>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100">
+            <div class="mb-3">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Senha da Diretoria (padrão: <code>admin123</code>)</label>
+              <input type="password" id="loginDiretorSenha" value="admin123" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:border-indigo-600">
+            </div>
+            <button onclick="loginComoDiretor()" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer">
+              <span>Entrar como Diretor</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card Perfil Professor -->
+        <div class="bg-white border-2 border-slate-200 hover:border-emerald-500 rounded-2xl p-6 sm:p-7 transition-all shadow-xs flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+              </div>
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">
+                Corpo Docente
+              </span>
+            </div>
+            <h2 class="text-lg font-bold text-slate-900 mb-1">Professor(a)</h2>
+            <p class="text-xs sm:text-sm text-slate-600 mb-4 leading-relaxed">
+              Área do Professor: responda ao questionário usando caixas interativas [Ótimo, Bom, Regular, Ruim] e consulte o desempenho e panorama das turmas.
+            </p>
+            <ul class="text-xs text-slate-600 space-y-1.5 mb-6">
+              <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                Formulário com caixas táteis [Ótimo / Bom / Regular / Ruim]
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                Perguntas detalhadas sobre disciplina, foco e aprendizagem dos alunos
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                Visualização do desempenho da turma e panorama geral logo após responder
+              </li>
+            </ul>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100">
+            <div class="mb-3">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Seu Nome e Disciplina *</label>
+              <input type="text" id="loginProfNome" placeholder="Ex: Prof. Marcos (História)" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600">
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Sala de Aula</label>
+                <select id="loginProfSala" class="w-full text-xs px-2 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600 bg-white"></select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Turma</label>
+                <select id="loginProfTurma" class="w-full text-xs px-2 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600 bg-white"></select>
+              </div>
+            </div>
+            <button onclick="loginComoProfessor()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer">
+              <span>Iniciar Questionário</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TELA 2: ÁREA DO DIRETOR (ADMIN)                                -->
+    <!-- ============================================================== -->
+    <div id="viewDiretor" class="hidden">
+      <!-- Barra de Abas do Diretor -->
+      <div class="flex items-center gap-2 border-b border-slate-200 mb-6 overflow-x-auto">
+        <button id="tabDirBtnPerguntas" onclick="switchDiretorTab('perguntas')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-indigo-600 text-indigo-700 transition-colors whitespace-nowrap cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>Gerenciar Perguntas</span>
+        </button>
+        <button id="tabDirBtnRespostas" onclick="switchDiretorTab('respostas')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          <span>Respostas dos Professores</span>
+        </button>
+        <button id="tabDirBtnSalasTurmas" onclick="switchDiretorTab('salasturmas')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+          <span>Salas & Turmas</span>
+        </button>
+      </div>
+
+      <!-- ABA DIRETOR: PERGUNTAS -->
+      <div id="diretorAbaPerguntas" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Form Nova Pergunta -->
+        <div class="lg:col-span-5">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs sticky top-24">
+            <h3 class="text-base font-bold text-slate-900 mb-1">Cadastrar Nova Pergunta</h3>
+            <p class="text-xs text-slate-500 mb-4">A pergunta cadastrada aqui aparecerá imediatamente para os professores responderem.</p>
+
+            <form onsubmit="salvarNovaPergunta(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Enunciado da Pergunta *</label>
+                <textarea id="dirPerguntaEnunciado" required rows="3" placeholder="Ex: Como foi a pontualidade e o comportamento dos alunos no início da aula?" class="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:outline-hidden focus:border-indigo-600"></textarea>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Categoria / Foco</label>
+                  <select id="dirPerguntaCategoria" class="w-full text-xs px-2.5 py-2 border border-slate-300 rounded-lg bg-white">
+                    <option value="turma">Alunos / Dinâmica da Turma</option>
+                    <option value="sala">Estrutura Física da Sala</option>
+                    <option value="geral">Geral / Observações</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Formato de Resposta</label>
+                  <select id="dirPerguntaTipo" onchange="toggleOpcoesMultiplaDir()" class="w-full text-xs px-2.5 py-2 border border-slate-300 rounded-lg bg-white">
+                    <option value="escala">Caixas [Ótimo / Bom / Regular / Ruim]</option>
+                    <option value="sim_nao">Sim ou Não</option>
+                    <option value="multipla_escolha">Múltipla Escolha</option>
+                    <option value="texto">Texto Livre / Descritivo</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="dirGrupoOpcoesMultipla" class="hidden">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Opções de Escolha (uma por linha)</label>
+                <textarea id="dirPerguntaOpcoes" rows="3" placeholder="Excelente&#10;Adequado&#10;Abaixo do esperado" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 rounded-lg"></textarea>
+              </div>
+
+              <div class="flex items-center justify-between pt-2">
+                <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                  <input type="checkbox" id="dirPerguntaObrigatoria" checked class="w-4 h-4 text-indigo-600 rounded">
+                  <span>Resposta Obrigatória</span>
+                </label>
+                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs cursor-pointer">
+                  + Cadastrar Pergunta
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Lista de Perguntas Cadastradas -->
+        <div class="lg:col-span-7">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Perguntas Cadastradas no Questionário</h3>
+                <p class="text-xs text-slate-500">O diretor pode excluir perguntas antigas ou adicionar novas a qualquer momento.</p>
+              </div>
+              <span id="badgeTotalPerguntas" class="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">0 perguntas</span>
+            </div>
+
+            <div id="containerPerguntasDir" class="divide-y divide-slate-100">
+              <!-- Renderizado via JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA DIRETOR: RESPOSTAS -->
+      <div id="diretorAbaRespostas" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Envios dos Professores Gravados no Banco</h3>
+            <p class="text-xs text-slate-500">Histórico de respostas gravadas no IndexedDB com data, professor, sala e turma.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportarCSV()" class="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              <span>Exportar Planilha CSV</span>
+            </button>
+            <button onclick="exportarBackupJSON()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              <span>Backup JSON</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="containerRespostasDir" class="space-y-3">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+
+      <!-- ABA DIRETOR: SALAS & TURMAS -->
+      <div id="diretorAbaSalasTurmas" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+          <h3 class="text-base font-bold text-slate-900 mb-1">Salas de Aula Cadastradas</h3>
+          <p class="text-xs text-slate-500 mb-4">Espaços físicos avaliados pelos professores.</p>
+          <form onsubmit="adicionarSalaDir(event)" class="flex gap-2 mb-4">
+            <input type="text" id="novaSalaInput" required placeholder="Ex: Laboratório Maker" class="flex-1 text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            <button type="submit" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold cursor-pointer">+</button>
+          </form>
+          <div id="listaSalasDir" class="divide-y divide-slate-100 text-xs"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+          <h3 class="text-base font-bold text-slate-900 mb-1">Turmas Cadastradas</h3>
+          <p class="text-xs text-slate-500 mb-4">Séries e classes avaliadas na escola.</p>
+          <form onsubmit="adicionarTurmaDir(event)" class="flex gap-2 mb-4">
+            <input type="text" id="novaTurmaInput" required placeholder="Ex: 2º Ano Médio B" class="flex-1 text-xs px-3 py-2 border border-slate-300 rounded-lg">
+            <button type="submit" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold cursor-pointer">+</button>
+          </form>
+          <div id="listaTurmasDir" class="divide-y divide-slate-100 text-xs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TELA 3: ÁREA DO PROFESSOR                                      -->
+    <!-- ============================================================== -->
+    <div id="viewProfessor" class="hidden max-w-4xl mx-auto space-y-6">
+      <!-- Card Contexto do Professor -->
+      <div class="bg-gradient-to-r from-emerald-700 via-teal-800 to-indigo-900 rounded-2xl p-5 sm:p-6 text-white shadow-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-400/40 text-[11px] font-semibold text-emerald-100 mb-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <span>Sessão do Docente</span>
+            </div>
+            <h2 id="profHeaderNome" class="text-xl sm:text-2xl font-extrabold tracking-tight">Professor</h2>
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 text-xs text-emerald-100 font-medium">
+              <span class="bg-black/25 px-2.5 py-1 rounded-md">Sala: <strong id="profHeaderSala" class="text-white">-</strong></span>
+              <span class="bg-black/25 px-2.5 py-1 rounded-md">Turma: <strong id="profHeaderTurma" class="text-white">-</strong></span>
+            </div>
+          </div>
+          <button onclick="logout()" class="self-start sm:self-auto px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/25 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer">
+            Trocar Usuário / Sala
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Abas do Professor (Responder / Desempenho / Panorama) -->
+      <div class="flex items-center gap-2 border-b border-slate-200 overflow-x-auto">
+        <button id="profTabBtnResponder" onclick="switchProfTab('responder')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-emerald-600 text-emerald-700 transition-colors whitespace-nowrap cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+          <span>Responder Questionário</span>
+        </button>
+        <button id="profTabBtnDesempenho" onclick="switchProfTab('desempenho')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          <span>Desempenho da Turma</span>
+        </button>
+        <button id="profTabBtnPanorama" onclick="switchProfTab('panorama')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+          <span>Panorama Geral das Turmas</span>
+        </button>
+      </div>
+
+      <!-- ABA PROFESSOR 1: RESPONDER -->
+      <div id="profAbaResponder">
+        <!-- Recibo de Sucesso pós-envio com botões diretos -->
+        <div id="profReciboSucesso" class="hidden bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 text-center shadow-xs">
+          <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          </div>
+          <h3 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Avaliação Gravada com Sucesso!</h3>
+          <p class="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto mt-2 leading-relaxed">
+            Suas respostas foram gravadas com sucesso no banco de dados local e já atualizaram o painel de desempenho da turma.
+          </p>
+
+          <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl mx-auto text-left">
+            <button onclick="switchProfTab('desempenho')" class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-950 transition-colors cursor-pointer">
+              <div class="text-xs font-bold flex items-center justify-between">
+                <span>Ver Desempenho</span>
+                <span class="text-emerald-600 font-bold">&rarr;</span>
+              </div>
+              <p class="text-[11px] text-slate-600 mt-1">Estatísticas detalhadas da turma que você acabou de avaliar.</p>
+            </button>
+            <button onclick="switchProfTab('panorama')" class="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-950 transition-colors cursor-pointer">
+              <div class="text-xs font-bold flex items-center justify-between">
+                <span>Ver Panorama</span>
+                <span class="text-indigo-600 font-bold">&rarr;</span>
+              </div>
+              <p class="text-[11px] text-slate-600 mt-1">Comparativo de todas as turmas da escola.</p>
+            </button>
+            <button onclick="novaAvaliacaoProf()" class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-900 transition-colors cursor-pointer">
+              <div class="text-xs font-bold flex items-center justify-between">
+                <span>Nova Avaliação</span>
+                <span class="text-slate-600 font-bold">&rarr;</span>
+              </div>
+              <p class="text-[11px] text-slate-600 mt-1">Responder para outra turma ou sala de aula.</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Formulário de Perguntas -->
+        <div id="profFormContainer" class="space-y-4">
+          <form id="formQuestionarioProf" onsubmit="enviarRespostasProf(event)" class="space-y-4">
+            <div id="listaPerguntasProf" class="space-y-4">
+              <!-- Renderizado via JS -->
+            </div>
+
+            <div class="pt-4 text-right">
+              <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                <span>Gravar Respostas no Banco de Dados</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ABA PROFESSOR 2: DESEMPENHO DA TURMA -->
+      <div id="profAbaDesempenho" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Desempenho da Turma</h3>
+            <p class="text-xs text-slate-500">Métricas calculadas em tempo real com base nas respostas dos professores.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-600">Turma Selecionada:</span>
+            <select id="selectTurmaDesempenho" onchange="renderizarDesempenhoTurma(this.value)" class="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5"></select>
+          </div>
+        </div>
+
+        <div id="metricasDesempenhoTurmaContainer">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+
+      <!-- ABA PROFESSOR 3: PANORAMA DAS TURMAS -->
+      <div id="profAbaPanorama" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+          <h3 class="text-base font-bold text-slate-900">Panorama Geral de Todas as Turmas</h3>
+          <p class="text-xs text-slate-500">Visão geral do aproveitamento, conduta e engajamento escolar em cada turma.</p>
+        </div>
+
+        <div id="gridPanoramaTurmas" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Renderizado via JS -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- TOAST DE NOTIFICAÇÃO                                           -->
+  <!-- ============================================================== -->
+  <div id="toastMessage" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl transition-all hidden"></div>
+
+  <!-- ============================================================== -->
+  <!-- FOOTER                                                         -->
+  <!-- ============================================================== -->
+  <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div>Colégio Saber Ativo &bull; Questionário Escolar Autônomo com IndexedDB</div>
+      <div class="flex items-center gap-3">
+        <button onclick="baixarArquivoHtmlAtual()" class="text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer underline">
+          Baixar este index.html autônomo
+        </button>
+        <span class="text-slate-300">|</span>
+        <span class="font-mono text-[11px] text-slate-400">Offline-First &bull; Compatível com GitHub Pages</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================== -->
+  <!-- JAVASCRIPT: ARQUITETURA RESILIENTE DE BANCO & LÓGICA DO APP     -->
+  <!-- ============================================================== -->
+  <script>
+    // Configurações do Banco IndexedDB com Fallback automático para LocalStorage
+    const DB_NAME = 'EscolaQuestionarioDB';
+    const DB_VERSION = 1;
+    let dbInstance = null;
+    let useFallbackStorage = false;
+
+    // Dados Iniciais Padrão com todas as perguntas sobre Salas, Turmas e Alunos
+    const DADOS_INICIAIS = {
+      salas: [
+        { id: 'sala-1', nome: 'Sala 101 - Bloco A' },
+        { id: 'sala-2', nome: 'Sala 102 - Bloco A' },
+        { id: 'sala-lab', nome: 'Laboratório de Ciências' },
+        { id: 'sala-info', nome: 'Laboratório de Informática' },
+        { id: 'sala-204', nome: 'Sala 204 - Multimídia' }
+      ],
+      turmas: [
+        { id: 'turma-6a', nome: '6º Ano A', turno: 'Manhã' },
+        { id: 'turma-7b', nome: '7º Ano B', turno: 'Manhã' },
+        { id: 'turma-8a', nome: '8º Ano A', turno: 'Tarde' },
+        { id: 'turma-9c', nome: '9º Ano C', turno: 'Tarde' },
+        { id: 'turma-1em', nome: '1º Ano Ensino Médio', turno: 'Manhã' }
+      ],
+      perguntas: [
+        {
+          id: 'p-1',
+          enunciado: 'Como você avalia as condições físicas da sala (iluminação, ventilação e ar-condicionado)?',
+          categoria: 'sala',
+          tipo: 'escala',
+          obrigatoria: true
+        },
+        {
+          id: 'p-2',
+          enunciado: 'Os equipamentos multimídia (projetor, TV, caixas de som) estavam em pleno funcionamento?',
+          categoria: 'sala',
+          tipo: 'sim_nao',
+          obrigatoria: true
+        },
+        {
+          id: 'p-4',
+          enunciado: 'Como foi o nível de foco, disciplina e atenção dos alunos durante as explicações da aula?',
+          categoria: 'turma',
+          tipo: 'escala',
+          obrigatoria: true
+        },
+        {
+          id: 'p-5',
+          enunciado: 'Os alunos trouxeram os materiais pedagógicos e realizaram as tarefas/atividades de casa?',
+          categoria: 'turma',
+          tipo: 'multipla_escolha',
+          opcoes: [
+            'Quase a totalidade (acima de 90%)',
+            'Maioria dos alunos (70% a 90%)',
+            'Cerca da metade (50%)',
+            'Minoria ou insuficiente (<50%)'
+          ],
+          obrigatoria: true
+        },
+        {
+          id: 'p-6',
+          enunciado: 'Houve alguma ocorrência disciplinar grave ou necessidade de mediação pedagógica?',
+          categoria: 'turma',
+          tipo: 'sim_nao',
+          obrigatoria: true
+        },
+        {
+          id: 'p-8',
+          enunciado: 'Como você avalia o ritmo de compreensão e assimilação do conteúdo pelos alunos nesta aula?',
+          categoria: 'turma',
+          tipo: 'escala',
+          obrigatoria: true
+        },
+        {
+          id: 'p-9',
+          enunciado: 'Houve dispersão causada por conversas paralelas ou uso indevido de celulares/eletrônicos?',
+          categoria: 'turma',
+          tipo: 'multipla_escolha',
+          opcoes: [
+            'Não, alunos mantiveram foco exemplar',
+            'Poucos casos pontuais resolvidos rapidamente',
+            'Dispersão moderada em alguns grupos',
+            'Dispersão frequente que prejudicou o rendimento'
+          ],
+          obrigatoria: true
+        },
+        {
+          id: 'p-10',
+          enunciado: 'Foram identificados alunos com defasagem acentuada que necessitam de reforço pedagógico?',
+          categoria: 'turma',
+          tipo: 'sim_nao',
+          obrigatoria: true
+        },
+        {
+          id: 'p-14',
+          enunciado: 'Cite nomes de alunos que se destacaram positivamente ou que necessitam de apoio individual:',
+          categoria: 'turma',
+          tipo: 'texto',
+          obrigatoria: false
+        },
+        {
+          id: 'p-7',
+          enunciado: 'Observações adicionais ou solicitações para a direção e coordenação:',
+          categoria: 'geral',
+          tipo: 'texto',
+          obrigatoria: false
+        }
+      ],
+      respostas: [
+        {
+          id: 'resp-1',
+          professorNome: 'Prof. Carlos Eduardo (Matemática)',
+          salaId: 'sala-1',
+          salaNome: 'Sala 101 - Bloco A',
+          turmaId: 'turma-6a',
+          turmaNome: '6º Ano A',
+          respostas: {
+            'p-1': 'Ótimo',
+            'p-2': 'Sim',
+            'p-4': 'Ótimo',
+            'p-5': 'Quase a totalidade (acima de 90%)',
+            'p-6': 'Não',
+            'p-8': 'Ótimo',
+            'p-9': 'Não, alunos mantiveram foco exemplar',
+            'p-10': 'Não',
+            'p-14': 'Aluna Beatriz e aluno Lucas com excelente participação e foco nos exercícios.',
+            'p-7': 'A aula fluiu com excelente rendimento e participação ativa da turma.'
+          },
+          timestamp: Date.now() - 3600000 * 24
+        }
+      ]
+    };
+
+    // Armazenamento em memória para contingência extrema
+    const memoryStorage = {
+      salas: [...DADOS_INICIAIS.salas],
+      turmas: [...DADOS_INICIAIS.turmas],
+      perguntas: [...DADOS_INICIAIS.perguntas],
+      respostas: [...DADOS_INICIAIS.respostas]
+    };
+
+    // Inicialização do Banco com Proteção Completa contra Erros
+    function initDB() {
+      return new Promise((resolve) => {
+        try {
+          if (!window.indexedDB) {
+            console.warn('IndexedDB não suportado. Usando LocalStorage fallback.');
+            useFallbackStorage = true;
+            initFallbackStorage();
+            return resolve(null);
+          }
+
+          const req = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+          req.onupgradeneeded = (e) => {
+            const d = e.target.result;
+            if (!d.objectStoreNames.contains('salas')) d.createObjectStore('salas', { keyPath: 'id' });
+            if (!d.objectStoreNames.contains('turmas')) d.createObjectStore('turmas', { keyPath: 'id' });
+            if (!d.objectStoreNames.contains('perguntas')) d.createObjectStore('perguntas', { keyPath: 'id' });
+            if (!d.objectStoreNames.contains('respostas')) {
+              const st = d.createObjectStore('respostas', { keyPath: 'id' });
+              st.createIndex('timestamp', 'timestamp');
+            }
+          };
+
+          req.onsuccess = async (e) => {
+            dbInstance = e.target.result;
+            await seedIfEmpty();
+            const statusEl = document.getElementById('dbStatusLabel');
+            if (statusEl) statusEl.textContent = 'IndexedDB Ativo';
+            resolve(dbInstance);
+          };
+
+          req.onerror = () => {
+            console.warn('Erro ao abrir IndexedDB. Ativando fallback LocalStorage.');
+            useFallbackStorage = true;
+            initFallbackStorage();
+            resolve(null);
+          };
+        } catch (err) {
+          console.warn('Exceção ao inicializar IndexedDB:', err);
+          useFallbackStorage = true;
+          initFallbackStorage();
+          resolve(null);
+        }
+      });
+    }
+
+    function initFallbackStorage() {
+      try {
+        ['salas', 'turmas', 'perguntas', 'respostas'].forEach(key => {
+          if (!localStorage.getItem('escola_' + key)) {
+            localStorage.setItem('escola_' + key, JSON.stringify(DADOS_INICIAIS[key]));
+          }
+        });
+        const statusEl = document.getElementById('dbStatusLabel');
+        if (statusEl) statusEl.textContent = 'LocalStorage Ativo';
+      } catch (e) {
+        console.warn('LocalStorage também bloqueado; usando memória de sessão.', e);
+        const statusEl = document.getElementById('dbStatusLabel');
+        if (statusEl) statusEl.textContent = 'Memória Ativa';
+      }
+    }
+
+    async function seedIfEmpty() {
+      try {
+        const salas = await getAllStore('salas');
+        if (salas.length === 0) {
+          for (let s of DADOS_INICIAIS.salas) await saveStore('salas', s);
+          for (let t of DADOS_INICIAIS.turmas) await saveStore('turmas', t);
+          for (let p of DADOS_INICIAIS.perguntas) await saveStore('perguntas', p);
+          for (let r of DADOS_INICIAIS.respostas) await saveStore('respostas', r);
+        } else {
+          // Garante que todas as perguntas padrão dos alunos estejam presentes
+          const existingP = await getAllStore('perguntas');
+          const ids = new Set(existingP.map(x => x.id));
+          for (let p of DADOS_INICIAIS.perguntas) {
+            if (!ids.has(p.id)) await saveStore('perguntas', p);
+          }
+        }
+      } catch (err) {
+        console.warn('Aviso no seed:', err);
+      }
+    }
+
+    function getAllStore(storeName) {
+      return new Promise((res) => {
+        if (useFallbackStorage || !dbInstance) {
+          try {
+            const raw = localStorage.getItem('escola_' + storeName);
+            if (raw) return res(JSON.parse(raw));
+          } catch (e) {}
+          return res(memoryStorage[storeName] || []);
+        }
+
+        try {
+          const tx = dbInstance.transaction(storeName, 'readonly');
+          const st = tx.objectStore(storeName);
+          const req = st.getAll();
+          req.onsuccess = () => res(req.result || []);
+          req.onerror = () => {
+            try {
+              const raw = localStorage.getItem('escola_' + storeName);
+              if (raw) return res(JSON.parse(raw));
+            } catch (e) {}
+            res(memoryStorage[storeName] || []);
+          };
+        } catch (e) {
+          res(memoryStorage[storeName] || []);
+        }
+      });
+    }
+
+    function saveStore(storeName, item) {
+      return new Promise((res) => {
+        // Atualiza memória
+        const memIdx = memoryStorage[storeName].findIndex(x => x.id === item.id);
+        if (memIdx >= 0) memoryStorage[storeName][memIdx] = item;
+        else memoryStorage[storeName].push(item);
+
+        try {
+          localStorage.setItem('escola_' + storeName, JSON.stringify(memoryStorage[storeName]));
+        } catch (e) {}
+
+        if (useFallbackStorage || !dbInstance) {
+          return res();
+        }
+
+        try {
+          const tx = dbInstance.transaction(storeName, 'readwrite');
+          const st = tx.objectStore(storeName);
+          const req = st.put(item);
+          req.onsuccess = () => res();
+          req.onerror = () => res();
+        } catch (e) {
+          res();
+        }
+      });
+    }
+
+    function deleteStore(storeName, id) {
+      return new Promise((res) => {
+        memoryStorage[storeName] = memoryStorage[storeName].filter(x => x.id !== id);
+        try {
+          localStorage.setItem('escola_' + storeName, JSON.stringify(memoryStorage[storeName]));
+        } catch (e) {}
+
+        if (useFallbackStorage || !dbInstance) {
+          return res();
+        }
+
+        try {
+          const tx = dbInstance.transaction(storeName, 'readwrite');
+          const st = tx.objectStore(storeName);
+          const req = st.delete(id);
+          req.onsuccess = () => res();
+          req.onerror = () => res();
+        } catch (e) {
+          res();
+        }
+      });
+    }
+
+    // Gerenciamento de Sessão de Usuário
+    let currentUser = null;
+
+    function safeCreateIcons() {
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (e) {
+        // Ícones em fallback SVG já garantem a visibilidade
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toastMessage');
+      if (!t) return;
+      t.textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 3500);
+    }
+
+    // Login Diretor
+    function loginComoDiretor() {
+      currentUser = { role: 'diretor', nome: 'Diretoria Escolar' };
+      renderHeader();
+      mostrarTela('diretor');
+      carregarPerguntasDir();
+    }
+
+    // Login Professor
+    async function loginComoProfessor() {
+      const nomeInput = document.getElementById('loginProfNome');
+      const nome = nomeInput ? nomeInput.value.trim() : '';
+      const sSel = document.getElementById('loginProfSala');
+      const tSel = document.getElementById('loginProfTurma');
+
+      if (!nome) {
+        alert('Por favor, informe seu nome e disciplina.');
+        if (nomeInput) nomeInput.focus();
+        return;
+      }
+
+      currentUser = {
+        role: 'professor',
+        nome: nome,
+        salaId: sSel ? sSel.value : 'sala-1',
+        salaNome: sSel && sSel.options[sSel.selectedIndex] ? sSel.options[sSel.selectedIndex].text : 'Sala Principal',
+        turmaId: tSel ? tSel.value : 'turma-6a',
+        turmaNome: tSel && tSel.options[tSel.selectedIndex] ? tSel.options[tSel.selectedIndex].text : 'Turma Geral'
+      };
+
+      renderHeader();
+      mostrarTela('professor');
+      carregarQuestionarioProf();
+    }
+
+    function logout() {
+      currentUser = null;
+      renderHeader();
+      mostrarTela('login');
+    }
+
+    function mostrarTela(tela) {
+      const vLogin = document.getElementById('viewLogin');
+      const vDir = document.getElementById('viewDiretor');
+      const vProf = document.getElementById('viewProfessor');
+
+      if (vLogin) vLogin.classList.toggle('hidden', tela !== 'login');
+      if (vDir) vDir.classList.toggle('hidden', tela !== 'diretor');
+      if (vProf) vProf.classList.toggle('hidden', tela !== 'professor');
+
+      safeCreateIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function renderHeader() {
+      const el = document.getElementById('headerUserZone');
+      if (!el) return;
+
+      if (!currentUser) {
+        el.innerHTML = `
+          <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="dbStatusLabel">Banco Local Pronto</span>
+          </div>
+        `;
+      } else {
+        const isDir = currentUser.role === 'diretor';
+        el.innerHTML = `
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg text-xs border border-slate-200">
+              <span class="font-bold ${isDir ? 'text-indigo-700' : 'text-emerald-700'}">${isDir ? 'DIRETOR' : 'PROFESSOR'}:</span>
+              <span class="text-slate-800 font-medium">${currentUser.nome}</span>
+            </div>
+            <button onclick="logout()" class="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg cursor-pointer">
+              Sair
+            </button>
+          </div>
+        `;
+      }
+      safeCreateIcons();
+    }
+
+    async function popularSelectsLogin() {
+      const salas = await getAllStore('salas');
+      const turmas = await getAllStore('turmas');
+      const sEl = document.getElementById('loginProfSala');
+      const tEl = document.getElementById('loginProfTurma');
+
+      if (sEl) sEl.innerHTML = salas.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+      if (tEl) tEl.innerHTML = turmas.map(t => `<option value="${t.id}">${t.nome} (${t.turno || 'Manhã'})</option>`).join('');
+    }
+
+    // ==========================================
+    // LÓGICA DO DIRETOR: CADASTRO E EXCLUSÃO
+    // ==========================================
+    function switchDiretorTab(tab) {
+      const tabs = ['perguntas', 'respostas', 'salasturmas'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tabDirBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const aba = document.getElementById(`diretorAba${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (btn && aba) {
+          if (t === tab) {
+            btn.className = 'flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-indigo-600 text-indigo-700 transition-colors whitespace-nowrap cursor-pointer';
+            aba.classList.remove('hidden');
+          } else {
+            btn.className = 'flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap cursor-pointer';
+            aba.classList.add('hidden');
+          }
+        }
+      });
+
+      if (tab === 'perguntas') carregarPerguntasDir();
+      else if (tab === 'respostas') carregarRespostasDir();
+      else carregarSalasTurmasDir();
+      safeCreateIcons();
+    }
+
+    function toggleOpcoesMultiplaDir() {
+      const tipo = document.getElementById('dirPerguntaTipo').value;
+      const grp = document.getElementById('dirGrupoOpcoesMultipla');
+      if (grp) grp.classList.toggle('hidden', tipo !== 'multipla_escolha');
+    }
+
+    async function salvarNovaPergunta(e) {
+      e.preventDefault();
+      const enunciadoInput = document.getElementById('dirPerguntaEnunciado');
+      const enunciado = enunciadoInput.value.trim();
+      const categoria = document.getElementById('dirPerguntaCategoria').value;
+      const tipo = document.getElementById('dirPerguntaTipo').value;
+      const obrigatoria = document.getElementById('dirPerguntaObrigatoria').checked;
+
+      let opcoes = undefined;
+      if (tipo === 'multipla_escolha') {
+        const opcoesRaw = document.getElementById('dirPerguntaOpcoes').value;
+        opcoes = opcoesRaw.split('\n').map(o => o.trim()).filter(Boolean);
+        if (opcoes.length < 2) {
+          alert('Por favor, informe pelo menos 2 opções para a múltipla escolha (uma por linha).');
+          return;
+        }
+      }
+
+      const nova = {
+        id: 'p-' + Date.now(),
+        enunciado,
+        categoria,
+        tipo,
+        opcoes,
+        obrigatoria
+      };
+
+      await saveStore('perguntas', nova);
+      enunciadoInput.value = '';
+      const opcoesArea = document.getElementById('dirPerguntaOpcoes');
+      if (opcoesArea) opcoesArea.value = '';
+
+      showToast('Nova pergunta cadastrada com sucesso!');
+      carregarPerguntasDir();
+    }
+
+    async function excluirPerguntaDir(id) {
+      if (confirm('Deseja realmente excluir esta pergunta do questionário?')) {
+        await deleteStore('perguntas', id);
+        showToast('Pergunta excluída do banco.');
+        carregarPerguntasDir();
+      }
+    }
+
+    async function carregarPerguntasDir() {
+      const perguntas = await getAllStore('perguntas');
+      const badge = document.getElementById('badgeTotalPerguntas');
+      if (badge) badge.textContent = `${perguntas.length} cadastradas`;
+      const container = document.getElementById('containerPerguntasDir');
+      if (!container) return;
+
+      if (perguntas.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 py-6 text-center">Nenhuma pergunta cadastrada no momento.</p>';
+        return;
+      }
+
+      container.innerHTML = perguntas.map((p, idx) => `
+        <div class="py-3.5 flex items-start justify-between gap-3">
+          <div class="flex-1">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span class="text-xs font-mono font-bold text-slate-400">#${idx + 1}</span>
+              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                p.categoria === 'turma' ? 'bg-indigo-50 text-indigo-700' :
+                p.categoria === 'sala' ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-600'
+              }">${p.categoria === 'turma' ? 'Alunos / Turma' : p.categoria === 'sala' ? 'Sala de Aula' : 'Geral'}</span>
+              <span class="text-[10px] text-slate-500 font-medium">${
+                p.tipo === 'escala' ? 'Caixas [Ótimo / Bom / Regular / Ruim]' :
+                p.tipo === 'sim_nao' ? 'Sim / Não' :
+                p.tipo === 'multipla_escolha' ? 'Múltipla Escolha' : 'Texto Livre'
+              }</span>
+              ${p.obrigatoria ? '<span class="text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">Obrigatória</span>' : ''}
+            </div>
+            <p class="text-xs sm:text-sm font-semibold text-slate-900 leading-snug">${p.enunciado}</p>
+          </div>
+          <button onclick="excluirPerguntaDir('${p.id}')" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Excluir pergunta">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </button>
+        </div>
+      `).join('');
+      safeCreateIcons();
+    }
+
+    async function carregarRespostasDir() {
+      const respostas = await getAllStore('respostas');
+      const perguntas = await getAllStore('perguntas');
+      const container = document.getElementById('containerRespostasDir');
+      if (!container) return;
+
+      if (respostas.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 py-8 text-center bg-white rounded-xl border border-slate-200">Nenhuma resposta registrada ainda no banco.</p>';
+        return;
+      }
+
+      respostas.sort((a,b) => b.timestamp - a.timestamp);
+
+      container.innerHTML = respostas.map(r => {
+        const d = new Date(r.timestamp).toLocaleString('pt-BR');
+        const items = Object.entries(r.respostas).map(([pid, val]) => {
+          const p = perguntas.find(x => x.id === pid);
+          return `
+            <div class="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200/70">
+              <span class="text-slate-500 block mb-0.5 leading-snug">${p ? p.enunciado : pid}:</span>
+              <strong class="text-indigo-900 font-semibold">${val}</strong>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-100">
+              <div>
+                <strong class="text-sm text-slate-900">${r.professorNome}</strong>
+                <span class="text-xs text-slate-500 ml-2">&bull; Sala: <strong class="text-slate-700">${r.salaNome}</strong> &bull; Turma: <strong class="text-slate-700">${r.turmaNome}</strong></span>
+              </div>
+              <span class="text-xs text-slate-400 font-mono">${d}</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${items}
+            </div>
+          </div>
+        `;
+      }).join('');
+      safeCreateIcons();
+    }
+
+    async function carregarSalasTurmasDir() {
+      const salas = await getAllStore('salas');
+      const turmas = await getAllStore('turmas');
+
+      const sContainer = document.getElementById('listaSalasDir');
+      const tContainer = document.getElementById('listaTurmasDir');
+
+      if (sContainer) {
+        sContainer.innerHTML = salas.map(s => `
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="font-medium text-slate-800">${s.nome}</span>
+            <button onclick="removerSalaDir('${s.id}')" class="text-slate-400 hover:text-red-600 p-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+          </div>
+        `).join('');
+      }
+
+      if (tContainer) {
+        tContainer.innerHTML = turmas.map(t => `
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="font-medium text-slate-800">${t.nome} <span class="text-slate-400 text-[11px]">(${t.turno || 'Manhã'})</span></span>
+            <button onclick="removerTurmaDir('${t.id}')" class="text-slate-400 hover:text-red-600 p-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+          </div>
+        `).join('');
+      }
+      safeCreateIcons();
+    }
+
+    async function adicionarSalaDir(e) {
+      e.preventDefault();
+      const inp = document.getElementById('novaSalaInput');
+      if (!inp || !inp.value.trim()) return;
+      await saveStore('salas', { id: 'sala-' + Date.now(), nome: inp.value.trim() });
+      inp.value = '';
+      carregarSalasTurmasDir();
+      popularSelectsLogin();
+      showToast('Sala de aula adicionada!');
+    }
+
+    async function removerSalaDir(id) {
+      if (confirm('Deseja excluir esta sala?')) {
+        await deleteStore('salas', id);
+        carregarSalasTurmasDir();
+        popularSelectsLogin();
+        showToast('Sala removida.');
+      }
+    }
+
+    async function adicionarTurmaDir(e) {
+      e.preventDefault();
+      const inp = document.getElementById('novaTurmaInput');
+      if (!inp || !inp.value.trim()) return;
+      await saveStore('turmas', { id: 'turma-' + Date.now(), nome: inp.value.trim(), turno: 'Manhã' });
+      inp.value = '';
+      carregarSalasTurmasDir();
+      popularSelectsLogin();
+      showToast('Turma adicionada!');
+    }
+
+    async function removerTurmaDir(id) {
+      if (confirm('Deseja excluir esta turma?')) {
+        await deleteStore('turmas', id);
+        carregarSalasTurmasDir();
+        popularSelectsLogin();
+        showToast('Turma removida.');
+      }
+    }
+
+    async function exportarCSV() {
+      const respostas = await getAllStore('respostas');
+      const perguntas = await getAllStore('perguntas');
+      if (respostas.length === 0) return alert('Nenhuma resposta para exportar.');
+
+      let csv = '\uFEFFData,Professor,Sala,Turma';
+      perguntas.forEach(p => csv += `,"${p.enunciado.replace(/"/g, '""')}"`);
+      csv += '\n';
+
+      respostas.forEach(r => {
+        const d = new Date(r.timestamp).toLocaleString('pt-BR');
+        let row = `"${d}","${r.professorNome}","${r.salaNome}","${r.turmaNome}"`;
+        perguntas.forEach(p => {
+          const v = r.respostas[p.id] !== undefined ? r.respostas[p.id] : '';
+          row += `,"${String(v).replace(/"/g, '""')}"`;
+        });
+        csv += row + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `questionario_escolar_${Date.now()}.csv`;
+      a.click();
+    }
+
+    async function exportarBackupJSON() {
+      const salas = await getAllStore('salas');
+      const turmas = await getAllStore('turmas');
+      const perguntas = await getAllStore('perguntas');
+      const respostas = await getAllStore('respostas');
+      const data = { salas, turmas, perguntas, respostas, exportadoEm: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `backup_escolar_indexeddb_${Date.now()}.json`;
+      a.click();
+    }
+
+    // ==========================================
+    // LÓGICA DO PROFESSOR: CAIXAS, DESEMPENHO E PANORAMA
+    // ==========================================
+    function switchProfTab(tab) {
+      const tabs = ['responder', 'desempenho', 'panorama'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`profTabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const aba = document.getElementById(`profAba${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (btn && aba) {
+          if (t === tab) {
+            btn.className = 'flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-emerald-600 text-emerald-700 transition-colors whitespace-nowrap cursor-pointer';
+            aba.classList.remove('hidden');
+          } else {
+            btn.className = 'flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors whitespace-nowrap cursor-pointer';
+            aba.classList.add('hidden');
+          }
+        }
+      });
+
+      if (tab === 'desempenho') popularSelectDesempenho();
+      else if (tab === 'panorama') renderizarPanoramaTurmas();
+      safeCreateIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function novaAvaliacaoProf() {
+      document.getElementById('profReciboSucesso').classList.add('hidden');
+      document.getElementById('profFormContainer').classList.remove('hidden');
+      document.getElementById('formQuestionarioProf').reset();
+      document.querySelectorAll('.btn-caixa').forEach(b => {
+        b.className = b.className.replace(/active-(otimo|bom|regular|ruim)/g, '');
+      });
+      safeCreateIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function carregarQuestionarioProf() {
+      if (!currentUser) return;
+      document.getElementById('profHeaderNome').textContent = currentUser.nome;
+      document.getElementById('profHeaderSala').textContent = currentUser.salaNome;
+      document.getElementById('profHeaderTurma').textContent = currentUser.turmaNome;
+
+      document.getElementById('profReciboSucesso').classList.add('hidden');
+      document.getElementById('profFormContainer').classList.remove('hidden');
+
+      const perguntas = await getAllStore('perguntas');
+      const container = document.getElementById('listaPerguntasProf');
+      if (!container) return;
+
+      if (perguntas.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 py-8 text-center bg-white rounded-xl border border-slate-200">Nenhuma pergunta ativa no momento.</p>';
+        return;
+      }
+
+      // Ordenar por categoria: sala, turma, geral
+      const ordem = { 'sala': 1, 'turma': 2, 'geral': 3 };
+      perguntas.sort((a,b) => (ordem[a.categoria] || 99) - (ordem[b.categoria] || 99));
+
+      let lastCategory = '';
+      let html = '';
+
+      perguntas.forEach((p, idx) => {
+        // Cabeçalhos de Seções Temáticas
+        if (p.categoria !== lastCategory) {
+          lastCategory = p.categoria;
+          const titulos = {
+            'sala': '1. Infraestrutura e Instalações da Sala de Aula',
+            'turma': '2. Avaliação dos Alunos & Dinâmica Pedagógica da Turma',
+            'geral': '3. Observações Gerais & Encaminhamentos'
+          };
+          html += `
+            <div class="pt-3 pb-1">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-200/70 px-3 py-1 rounded-md">
+                ${titulos[p.categoria] || p.categoria}
+              </span>
+            </div>
+          `;
+        }
+
+        let inputHtml = '';
+
+        if (p.tipo === 'escala') {
+          // CAIXAS INTERATIVAS: Ótimo / Bom / Regular / Ruim
+          inputHtml = `
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2" id="caixa_group_${p.id}">
+              <button type="button" onclick="selecionarCaixa('${p.id}', 'Ótimo')" class="btn-caixa p-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-left transition-all cursor-pointer flex flex-col justify-between hover:border-slate-300">
+                <span class="text-xs font-extrabold uppercase text-slate-800">Ótimo</span>
+                <span class="text-[10px] text-slate-500 font-medium">Excelente</span>
+              </button>
+              <button type="button" onclick="selecionarCaixa('${p.id}', 'Bom')" class="btn-caixa p-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-left transition-all cursor-pointer flex flex-col justify-between hover:border-slate-300">
+                <span class="text-xs font-extrabold uppercase text-slate-800">Bom</span>
+                <span class="text-[10px] text-slate-500 font-medium">Dentro do padrão</span>
+              </button>
+              <button type="button" onclick="selecionarCaixa('${p.id}', 'Regular')" class="btn-caixa p-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-left transition-all cursor-pointer flex flex-col justify-between hover:border-slate-300">
+                <span class="text-xs font-extrabold uppercase text-slate-800">Regular</span>
+                <span class="text-[10px] text-slate-500 font-medium">Requer atenção</span>
+              </button>
+              <button type="button" onclick="selecionarCaixa('${p.id}', 'Ruim')" class="btn-caixa p-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-left transition-all cursor-pointer flex flex-col justify-between hover:border-slate-300">
+                <span class="text-xs font-extrabold uppercase text-slate-800">Ruim</span>
+                <span class="text-[10px] text-slate-500 font-medium">Abaixo do esperado</span>
+              </button>
+              <input type="hidden" name="resp_${p.id}" id="input_${p.id}" ${p.obrigatoria ? 'required' : ''}>
+            </div>
+          `;
+        } else if (p.tipo === 'sim_nao') {
+          inputHtml = `
+            <div class="flex gap-3 mt-2">
+              <label class="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 text-xs font-bold flex items-center gap-2 cursor-pointer hover:bg-slate-100">
+                <input type="radio" name="resp_${p.id}" value="Sim" ${p.obrigatoria ? 'required' : ''} class="text-emerald-600"> Sim
+              </label>
+              <label class="px-5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 text-xs font-bold flex items-center gap-2 cursor-pointer hover:bg-slate-100">
+                <input type="radio" name="resp_${p.id}" value="Não" class="text-emerald-600"> Não
+              </label>
+            </div>
+          `;
+        } else if (p.tipo === 'multipla_escolha') {
+          inputHtml = `
+            <div class="space-y-1.5 mt-2">
+              ${(p.opcoes || []).map(opt => `
+                <label class="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs flex items-center gap-2.5 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <input type="radio" name="resp_${p.id}" value="${opt}" ${p.obrigatoria ? 'required' : ''} class="text-emerald-600">
+                  <span class="font-medium text-slate-800">${opt}</span>
+                </label>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          inputHtml = `
+            <textarea name="resp_${p.id}" rows="3" placeholder="Digite aqui suas observações pedagógicas..." class="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:bg-white mt-2" ${p.obrigatoria ? 'required' : ''}></textarea>
+          `;
+        }
+
+        html += `
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="text-xs font-bold text-slate-400 font-mono">#${idx + 1}</span>
+              <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">${
+                p.categoria === 'turma' ? 'Alunos / Turma' : p.categoria === 'sala' ? 'Sala' : 'Geral'
+              }</span>
+              ${p.obrigatoria ? '<span class="text-[9px] font-bold text-rose-600 bg-rose-50 px-1 rounded">Obrigatória</span>' : ''}
+            </div>
+            <h4 class="text-xs sm:text-sm font-bold text-slate-900 leading-snug">${p.enunciado}</h4>
+            ${inputHtml}
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      safeCreateIcons();
+    }
+
+    function selecionarCaixa(perguntaId, valor) {
+      const inp = document.getElementById('input_' + perguntaId);
+      if (inp) inp.value = valor;
+      const group = document.getElementById('caixa_group_' + perguntaId);
+      if (!group) return;
+
+      const mapClass = {
+        'Ótimo': 'active-otimo',
+        'Bom': 'active-bom',
+        'Regular': 'active-regular',
+        'Ruim': 'active-ruim'
+      };
+
+      group.querySelectorAll('.btn-caixa').forEach(btn => {
+        btn.classList.remove('active-otimo', 'active-bom', 'active-regular', 'active-ruim');
+        const spanTxt = btn.querySelector('span')?.textContent.trim();
+        if (spanTxt === valor) {
+          btn.classList.add(mapClass[valor]);
+        }
+      });
+    }
+
+    async function enviarRespostasProf(e) {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData(form);
+      const perguntas = await getAllStore('perguntas');
+
+      const respostasObj = {};
+      for (let p of perguntas) {
+        const val = formData.get(`resp_${p.id}`);
+        if (p.obrigatoria && (!val || String(val).trim() === '')) {
+          alert(`Por favor, responda à pergunta obrigatória: "${p.enunciado}"`);
+          return;
+        }
+        if (val) respostasObj[p.id] = val;
+      }
+
+      const envio = {
+        id: 'resp-' + Date.now(),
+        professorNome: currentUser.nome,
+        salaId: currentUser.salaId,
+        salaNome: currentUser.salaNome,
+        turmaId: currentUser.turmaId,
+        turmaNome: currentUser.turmaNome,
+        respostas: respostasObj,
+        timestamp: Date.now()
+      };
+
+      await saveStore('respostas', envio);
+
+      // Exibe recibo de sucesso imediatamente
+      document.getElementById('profFormContainer').classList.add('hidden');
+      document.getElementById('profReciboSucesso').classList.remove('hidden');
+      showToast('Respostas gravadas com sucesso no banco de dados!');
+      safeCreateIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Desempenho da Turma
+    async function popularSelectDesempenho() {
+      const turmas = await getAllStore('turmas');
+      const sel = document.getElementById('selectTurmaDesempenho');
+      if (!sel) return;
+
+      sel.innerHTML = turmas.map(t => `
+        <option value="${t.id}" ${t.id === currentUser?.turmaId ? 'selected' : ''}>${t.nome}</option>
+      `).join('');
+
+      const targetId = currentUser?.turmaId || (turmas[0] ? turmas[0].id : null);
+      if (targetId) renderizarDesempenhoTurma(targetId);
+    }
+
+    async function renderizarDesempenhoTurma(turmaId) {
+      const turmas = await getAllStore('turmas');
+      const respostas = await getAllStore('respostas');
+      const turma = turmas.find(t => t.id === turmaId);
+      const container = document.getElementById('metricasDesempenhoTurmaContainer');
+      if (!container || !turma) return;
+
+      const rList = respostas.filter(r => r.turmaId === turmaId);
+      if (rList.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 py-8 text-center bg-white rounded-2xl border border-slate-200">Nenhuma avaliação registrada para esta turma ainda.</p>';
+        return;
+      }
+
+      const scores = [];
+      const obs = [];
+      let ocorrencias = 0;
+
+      rList.forEach(r => {
+        Object.entries(r.respostas).forEach(([pid, val]) => {
+          if (val === 'Ótimo') scores.push(5);
+          else if (val === 'Bom') scores.push(4);
+          else if (val === 'Regular') scores.push(3);
+          else if (val === 'Ruim') scores.push(1);
+
+          if (pid === 'p-6' && val === 'Sim') ocorrencias++;
+          if ((pid === 'p-14' || pid === 'p-7') && typeof val === 'string' && val.trim().length > 3) {
+            obs.push(`<strong>${r.professorNome}:</strong> "${val}"`);
+          }
+        });
+      });
+
+      const media = scores.length > 0 ? (scores.reduce((a,b)=>a+b, 0) / scores.length).toFixed(1) : '5.0';
+      const status = media >= 4 ? 'Ótimo' : media >= 3 ? 'Bom / Regular' : 'Atenção';
+      const corStatus = media >= 4 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : media >= 3 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-rose-700 bg-rose-50 border-rose-200';
+
+      container.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Média Geral da Turma</span>
+            <div class="text-3xl font-extrabold text-slate-900 mt-1 font-mono">${media} / 5.0</div>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded border inline-block mt-2 ${corStatus}">${status}</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Aulas Avaliadas</span>
+            <div class="text-3xl font-extrabold text-slate-900 mt-1 font-mono">${rList.length}</div>
+            <span class="text-xs text-slate-500 mt-2 block">avaliações gravadas</span>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ocorrências Disciplinares</span>
+            <div class="text-3xl font-extrabold mt-1 font-mono ${ocorrencias > 0 ? 'text-rose-600' : 'text-slate-900'}">${ocorrencias}</div>
+            <span class="text-xs text-slate-500 mt-2 block">${ocorrencias > 0 ? 'Exige atenção da coordenação' : 'Nenhuma ocorrência grave'}</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">Observações Pedagógicas & Alunos Citados em ${turma.nome}:</h4>
+          ${obs.length === 0 ? '<p class="text-xs text-slate-400 italic">Nenhum comentário descritivo registrado até o momento.</p>' : obs.map(o => `
+            <div class="p-3 rounded-lg bg-slate-50 border border-slate-200/70 text-xs text-slate-700 mb-2">${o}</div>
+          `).join('')}
+        </div>
+      `;
+      safeCreateIcons();
+    }
+
+    // Panorama Geral das Turmas
+    async function renderizarPanoramaTurmas() {
+      const turmas = await getAllStore('turmas');
+      const respostas = await getAllStore('respostas');
+      const container = document.getElementById('gridPanoramaTurmas');
+      if (!container) return;
+
+      container.innerHTML = turmas.map(t => {
+        const rList = respostas.filter(r => r.turmaId === t.id);
+        const scores = [];
+        rList.forEach(r => {
+          Object.values(r.respostas).forEach(val => {
+            if (val === 'Ótimo') scores.push(5);
+            else if (val === 'Bom') scores.push(4);
+            else if (val === 'Regular') scores.push(3);
+            else if (val === 'Ruim') scores.push(1);
+          });
+        });
+
+        const media = scores.length > 0 ? (scores.reduce((a,b)=>a+b, 0) / scores.length).toFixed(1) : '-';
+        const status = media >= 4 ? 'Ótimo' : media >= 3 ? 'Regular' : media !== '-' ? 'Atenção' : 'Sem dados';
+        const corStatus = media >= 4 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : media >= 3 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-slate-500 bg-slate-100 border-slate-200';
+
+        return `
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:border-emerald-300 transition-colors">
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <h4 class="text-base font-extrabold text-slate-900">${t.nome}</h4>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded border ${corStatus}">${status}</span>
+              </div>
+              <div class="text-xs text-slate-500 mb-3">Turno: ${t.turno || 'Manhã'} &bull; ${rList.length} aulas avaliadas</div>
+              <div class="text-xs p-2.5 bg-slate-50 rounded-lg">
+                Média Geral: <strong class="text-slate-900 font-mono text-sm">${media !== '-' ? media + ' / 5.0' : 'Sem notas'}</strong>
+              </div>
+            </div>
+            <button onclick="verDesempenhoDireto('${t.id}')" class="mt-4 w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold cursor-pointer">
+              Ver Desempenho &rarr;
+            </button>
+          </div>
+        `;
+      }).join('');
+      safeCreateIcons();
+    }
+
+    function verDesempenhoDireto(turmaId) {
+      switchProfTab('desempenho');
+      const sel = document.getElementById('selectTurmaDesempenho');
+      if (sel) sel.value = turmaId;
+      renderizarDesempenhoTurma(turmaId);
+    }
+
+    // Função para baixar o próprio código HTML como arquivo único offline
+    function baixarArquivoHtmlAtual() {
+      const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'index.html';
+      a.click();
+    }
+
+    // Inicialização da Aplicação
+    async function iniciarAplicacao() {
+      await initDB();
+      await popularSelectsLogin();
+      safeCreateIcons();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', iniciarAplicacao);
+    } else {
+      iniciarAplicacao();
+    }
+  </script>
+</body>
+</html>

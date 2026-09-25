@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema Escolar - Questionário de Salas & Turmas (IndexedDB)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4338ca;
+      --primary-hover: #3730a3;
+      --primary-light: #e0e7ff;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #f1f5f9;
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-danger {
+      background: #fef2f2;
+      color: var(--danger);
+      border-color: #fecaca;
+    }
+    .btn-danger:hover {
+      background: #fee2e2;
+    }
+
+    .btn-success {
+      background: #f0fdf4;
+      color: var(--success);
+      border-color: #bbf7d0;
+    }
+
+    .container {
+      max-width: 1050px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      flex: 1;
+      width: 100%;
+    }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+
+    .tab-btn {
+      padding: 0.75rem 1.25rem;
+      font-weight: 600;
+      font-size: 0.925rem;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+    }
+
+    /* Form Inputs */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: #334155;
+    }
+
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.12);
+    }
+
+    /* Login Selector */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .role-card {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      background: var(--surface);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .role-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(67, 56, 202, 0.08);
+    }
+
+    .role-card.selected {
+      border-color: var(--primary);
+      background: #faf5ff;
+    }
+
+    .role-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Question items in Director list */
+    .question-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .question-row:last-child {
+      border-bottom: none;
+    }
+
+    .question-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Question items for Teacher */
+    .question-box {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      background: #fff;
+    }
+
+    .question-box.answered {
+      border-left: 4px solid var(--success);
+    }
+
+    .rating-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .rating-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .rating-btn:hover {
+      background: var(--primary-light);
+      border-color: var(--primary);
+    }
+
+    .rating-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* Formulário de Caixas Ótimo / Bom / Regular / Ruim */
+    .caixa-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.65rem;
+    }
+
+    .caixa-btn {
+      padding: 0.75rem;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: #f8fafc;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      transition: all 0.15s ease;
+    }
+
+    .caixa-btn strong {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .caixa-btn span {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .caixa-btn:hover {
+      border-color: #94a3b8;
+      background: #f1f5f9;
+    }
+
+    .caixa-btn.otimo.active {
+      background: #16a34a;
+      border-color: #16a34a;
+      color: #fff;
+    }
+    .caixa-btn.otimo.active span { color: #dcfce7; }
+
+    .caixa-btn.bom.active {
+      background: #0284c7;
+      border-color: #0284c7;
+      color: #fff;
+    }
+    .caixa-btn.bom.active span { color: #e0f2fe; }
+
+    .caixa-btn.regular.active {
+      background: #d97706;
+      border-color: #d97706;
+      color: #fff;
+    }
+    .caixa-btn.regular.active span { color: #fef3c7; }
+
+    .caixa-btn.ruim.active {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #fff;
+    }
+    .caixa-btn.ruim.active span { color: #fee2e2; }
+
+    .options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      background: #f8fafc;
+    }
+
+    .radio-option:hover {
+      background: #f1f5f9;
+    }
+
+    .radio-option input {
+      cursor: pointer;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Notification Banner */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #1e293b;
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      font-size: 0.9rem;
+      display: none;
+      z-index: 100;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      🏫 Gestão Escolar &bull; Questionários
+    </div>
+    <div class="user-badge" id="headerUserArea">
+      <span>Não autenticado</span>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- VIEW 1: LOGIN -->
+    <div id="viewLogin">
+      <div class="card" style="text-align: center; padding: 2.5rem 1.5rem;">
+        <h1 style="font-size: 1.75rem; margin-bottom: 0.5rem;">Acesso ao Portal Escolar</h1>
+        <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem;">
+          Selecione seu perfil abaixo para continuar. O diretor cadastra perguntas e analisa relatórios; o professor responde o questionário por turma e sala.
+        </p>
+
+        <div class="role-grid">
+          <div class="role-card" onclick="selectRole('diretor')">
+            <span class="role-badge">Acesso Administrativo</span>
+            <h3 style="margin-bottom: 0.35rem;">Diretor(a) Escolar</h3>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Cadastre, edite ou exclua perguntas sobre as salas e turmas. Veja respostas consolidadas e métricas.
+            </p>
+            <div id="diretorForm" style="display: none; margin-top: 1rem; text-align: left;" onclick="event.stopPropagation()">
+              <div class="form-group">
+                <label>Senha de Acesso (padrão: <code>admin123</code>)</label>
+                <input type="password" id="diretorSenha" value="admin123" placeholder="Digite sua senha">
+              </div>
+              <button class="btn btn-primary" style="width: 100%;" onclick="loginDiretor()">Entrar como Diretor</button>
+            </div>
+          </div>
+
+          <div class="role-card" onclick="selectRole('professor')">
+            <span class="role-badge" style="color: var(--success);">Corpo Docente</span>
+            <h3 style="margin-bottom: 0.35rem;">Professor(a)</h3>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+              Informe seu nome, a sala e a turma em que lecionou para responder o questionário do dia.
+            </p>
+            <div id="professorForm" style="display: none; margin-top: 1rem; text-align: left;" onclick="event.stopPropagation()">
+              <div class="form-group">
+                <label>Seu Nome / Disciplina</label>
+                <input type="text" id="profNome" placeholder="Ex: Profª Helena Silva (Português)">
+              </div>
+              <div class="form-group">
+                <label>Sala de Aula</label>
+                <select id="profSalaSelect"></select>
+              </div>
+              <div class="form-group">
+                <label>Turma</label>
+                <select id="profTurmaSelect"></select>
+              </div>
+              <button class="btn btn-primary" style="width: 100%;" onclick="loginProfessor()">Iniciar Questionário</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: DIRETOR -->
+    <div id="viewDiretor" style="display: none;">
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tabBtnPerguntas" onclick="switchDiretorTab('perguntas')">Gerenciar Perguntas</button>
+        <button class="tab-btn" id="tabBtnRespostas" onclick="switchDiretorTab('respostas')">Respostas & Relatórios</button>
+        <button class="tab-btn" id="tabBtnSalasTurmas" onclick="switchDiretorTab('salasturmas')">Salas & Turmas</button>
+      </div>
+
+      <!-- TAB: PERGUNTAS -->
+      <div id="diretorTabPerguntas">
+        <div class="card">
+          <h2 class="card-title">Nova Pergunta</h2>
+          <p class="card-subtitle">Cadastre perguntas que os professores deverão responder após as aulas.</p>
+
+          <form id="formNovaPergunta" onsubmit="salvarNovaPergunta(event)">
+            <div class="form-group">
+              <label>Enunciado da Pergunta *</label>
+              <input type="text" id="perguntaEnunciado" required placeholder="Ex: O ar-condicionado e a lousa estavam funcionando adequadamente?">
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+              <div class="form-group">
+                <label>Foco / Categoria</label>
+                <select id="perguntaCategoria">
+                  <option value="sala">Estrutura da Sala de Aula</option>
+                  <option value="turma">Desempenho / Conduta da Turma</option>
+                  <option value="geral">Geral / Observações</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Tipo de Resposta</label>
+                <select id="perguntaTipo" onchange="toggleOpcoesMultipla()">
+                  <option value="escala">Escala 1 a 5 (Estrelas / Avaliação)</option>
+                  <option value="sim_nao">Sim / Não</option>
+                  <option value="multipla_escolha">Múltipla Escolha</option>
+                  <option value="texto">Texto Dissertativo</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Obrigatória?</label>
+                <select id="perguntaObrigatoria">
+                  <option value="true">Sim, obrigatória</option>
+                  <option value="false">Opcional</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group" id="grupoOpcoesMultipla" style="display: none;">
+              <label>Opções de Múltipla Escolha (uma por linha)</label>
+              <textarea id="perguntaOpcoes" rows="3" placeholder="Excelente&#10;Bom&#10;Regular&#10;Ruim"></textarea>
+            </div>
+
+            <div style="text-align: right;">
+              <button type="submit" class="btn btn-primary">+ Salvar Pergunta</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h2 class="card-title">Perguntas Cadastradas</h2>
+              <p class="card-subtitle" style="margin-bottom: 0;">Lista atualizada no IndexedDB. O diretor pode excluir perguntas antigas ou desativar.</p>
+            </div>
+            <span class="tabular" id="totalPerguntasBadge" style="font-size: 0.875rem; color: var(--text-muted);">0 perguntas</span>
+          </div>
+
+          <div id="listaPerguntasContainer">
+            <!-- preenchido via script -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: RESPOSTAS -->
+      <div id="diretorTabRespostas" style="display: none;">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <h2 class="card-title">Respostas dos Professores</h2>
+              <p class="card-subtitle" style="margin-bottom: 0;">Visualização completa com dados salvos no IndexedDB.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary" onclick="exportarCSV()">Exportar CSV</button>
+              <button class="btn btn-secondary" onclick="exportarJSON()">Backup JSON</button>
+            </div>
+          </div>
+
+          <div id="respostasContainer">
+            <!-- preenchido via script -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: SALAS & TURMAS -->
+      <div id="diretorTabSalasTurmas" style="display: none;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+          <div class="card">
+            <h2 class="card-title">Salas Cadastradas</h2>
+            <p class="card-subtitle">Espaços físicos avaliados pelos professores.</p>
+            <form onsubmit="adicionarSala(event)" style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+              <input type="text" id="novaSalaNome" placeholder="Ex: Laboratório Maker" required>
+              <button type="submit" class="btn btn-primary">+</button>
+            </form>
+            <ul id="listaSalasConfig" style="list-style: none;"></ul>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Turmas Cadastradas</h2>
+            <p class="card-subtitle">Séries e classes que utilizam os espaços escolares.</p>
+            <form onsubmit="adicionarTurma(event)" style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+              <input type="text" id="novaTurmaNome" placeholder="Ex: 2º Ano Médio B" required>
+              <button type="submit" class="btn btn-primary">+</button>
+            </form>
+            <ul id="listaTurmasConfig" style="list-style: none;"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: PROFESSOR -->
+    <div id="viewProfessor" style="display: none;">
+      <div class="card" style="background: linear-gradient(135deg, #eef2ff, #f8fafc); border-color: #c7d2fe;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; color: #1e1b4b;" id="profCabecalhoNome">Professor</h2>
+            <p style="font-size: 0.875rem; color: #4338ca;" id="profCabecalhoDetalhes">Sala: - &bull; Turma: -</p>
+          </div>
+          <button class="btn btn-secondary" onclick="trocarSalaTurma()">Trocar Sala / Turma</button>
+        </div>
+      </div>
+
+      <!-- Abas do Professor -->
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tabProfBtnResponder" onclick="switchProfTab('responder')">Responder Questionário</button>
+        <button class="tab-btn" id="tabProfBtnDesempenho" onclick="switchProfTab('desempenho')">Desempenho da Turma</button>
+        <button class="tab-btn" id="tabProfBtnPanorama" onclick="switchProfTab('panorama')">Panorama das Turmas</button>
+      </div>
+
+      <!-- ABA 1: RESPONDER -->
+      <div id="profAbaResponder">
+        <div id="profSuccessCard" class="card" style="display: none; text-align: center; padding: 2rem;">
+          <h2 style="color: var(--success); margin-bottom: 0.5rem;">&check; Respostas Gravadas no Banco!</h2>
+          <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem;">
+            As avaliações foram salvas no IndexedDB com sucesso e já estão consolidadas nos relatórios.
+          </p>
+          <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="switchProfTab('desempenho')">Ver Desempenho da Turma</button>
+            <button class="btn btn-secondary" onclick="switchProfTab('panorama')">Ver Panorama Geral</button>
+            <button class="btn btn-secondary" onclick="novaAvaliacaoProfessor()">Responder Outra Aula</button>
+          </div>
+        </div>
+
+        <div class="card" id="profFormCard">
+          <h2 class="card-title">Questionário de Avaliação da Aula</h2>
+          <p class="card-subtitle">Utilize as caixas (Ótimo, Bom, Regular, Ruim) ou seletores para responder com rapidez.</p>
+
+          <form id="formQuestionarioProfessor" onsubmit="enviarRespostasProfessor(event)">
+            <div id="questionarioContainer">
+              <!-- preenchido via script -->
+            </div>
+
+            <div style="margin-top: 1.5rem; text-align: right;">
+              <button type="submit" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                &check; Gravar Respostas no Banco de Dados
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ABA 2: DESEMPENHO DA TURMA -->
+      <div id="profAbaDesempenho" style="display: none;">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+            <div>
+              <h2 class="card-title" id="desempenhoTituloTurma">Desempenho da Turma</h2>
+              <p class="card-subtitle" style="margin-bottom: 0;">Métricas e histórico consolidado do IndexedDB.</p>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 600;">Filtrar Turma:</label>
+              <select id="selectTurmaDesempenhoProf" onchange="carregarDesempenhoTurma(this.value)"></select>
+            </div>
+          </div>
+
+          <div id="desempenhoMetricasContainer">
+            <!-- preenchido via script -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 3: PANORAMA GERAL DAS TURMAS -->
+      <div id="profAbaPanorama" style="display: none;">
+        <div class="card">
+          <h2 class="card-title">Panorama Comparativo das Turmas</h2>
+          <p class="card-subtitle">Visão geral do termômetro de comportamento e aproveitamento escolar.</p>
+
+          <div id="panoramaTurmasContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+            <!-- preenchido via script -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toastMessage"></div>
+
+  <footer>
+    Sistema de Gestão Escolar &bull; Banco de Dados IndexedDB integrado &bull; Versão Autônoma HTML
+  </footer>
+
+  <script>
+    // ==========================================
+    // BANCO DE DADOS INDEXEDDB
+    // ==========================================
+    const DB_NAME = 'EscolaQuestionarioDB';
+    const DB_VERSION = 1;
+    let db;
+
+    const DADOS_INICIAIS = {
+      salas: [
+        { id: 'sala-1', nome: 'Sala 101 - Bloco A' },
+        { id: 'sala-2', nome: 'Sala 102 - Bloco A' },
+        { id: 'sala-3', nome: 'Laboratório de Ciências' },
+        { id: 'sala-4', nome: 'Sala de Informática' },
+        { id: 'sala-5', nome: 'Sala 204 - Multimídia' }
+      ],
+      turmas: [
+        { id: 'turma-1', nome: '6º Ano A' },
+        { id: 'turma-2', nome: '7º Ano B' },
+        { id: 'turma-3', nome: '8º Ano A' },
+        { id: 'turma-4', nome: '9º Ano C' },
+        { id: 'turma-5', nome: '1º Ano Médio' }
+      ],
+      perguntas: [
+        {
+          id: 'p-1',
+          enunciado: 'Como você avalia as condições físicas da sala (iluminação, ventilação e ar-condicionado)?',
+          categoria: 'sala',
+          tipo: 'escala',
+          obrigatoria: true
+        },
+        {
+          id: 'p-2',
+          enunciado: 'Os equipamentos multimídia (projetor, TV, caixas de som) estavam funcionando perfeitamente?',
+          categoria: 'sala',
+          tipo: 'sim_nao',
+          obrigatoria: true
+        },
+        {
+          id: 'p-3',
+          enunciado: 'Qual é o estado de conservação das carteiras e cadeiras?',
+          categoria: 'sala',
+          tipo: 'multipla_escolha',
+          opcoes: ['Excelente', 'Bom', 'Regular', 'Ruim (necessita reparo)'],
+          obrigatoria: true
+        },
+        {
+          id: 'p-4',
+          enunciado: 'Como foi o nível de foco, disciplina e atenção dos alunos durante as explicações da aula?',
+          categoria: 'turma',
+          tipo: 'escala',
+          obrigatoria: true
+        },
+        {
+          id: 'p-5',
+          enunciado: 'Os alunos trouxeram os materiais pedagógicos (livros, cadernos) e entregaram as atividades/deveres solicitados?',
+          categoria: 'turma',
+          tipo: 'multipla_escolha',
+          opcoes: [
+            'Quase a totalidade (acima de 90%)',
+            'Maioria dos alunos (70% a 90%)',
+            'Cerca da metade da turma (50%)',
+            'Minoria ou índice insuficiente (<50%)'
+          ],
+          obrigatoria: true
+        },
+        {
+          id: 'p-6',
+          enunciado: 'Houve ocorrência disciplinar grave, conflitos entre alunos ou necessidade de mediação pedagógica?',
+          categoria: 'turma',
+          tipo: 'sim_nao',
+          obrigatoria: true
+        },
+        {
+          id: 'p-8',
+          enunciado: 'Como você avalia o ritmo de compreensão e assimilação do conteúdo pelos alunos nesta aula?',
+          categoria: 'turma',
+          tipo: 'escala',
+          obrigatoria: true
+        },
+        {
+          id: 'p-9',
+          enunciado: 'Houve dispersão dos alunos causada por conversas paralelas ou uso indevido de celulares/eletrônicos?',
+          categoria: 'turma',
+          tipo: 'multipla_escolha',
+          opcoes: [
+            'Não, alunos mantiveram foco exemplar',
+            'Poucos casos pontuais e rapidamente solucionados',
+            'Dispersão moderada em alguns grupos de alunos',
+            'Dispersão frequente que prejudicou o andamento da aula'
+          ],
+          obrigatoria: true
+        },
+        {
+          id: 'p-10',
+          enunciado: 'Foram identificados alunos com defasagem acentuada ou que necessitam de reforço / apoio pedagógico específico?',
+          categoria: 'turma',
+          tipo: 'sim_nao',
+          obrigatoria: true
+        },
+        {
+          id: 'p-11',
+          enunciado: 'Como você avalia a colaboração, espírito de equipe e o respeito mútuo demonstrado entre os alunos?',
+          categoria: 'turma',
+          tipo: 'escala',
+          obrigatoria: true
+        },
+        {
+          id: 'p-12',
+          enunciado: 'Qual foi o nível de pontualidade e assiduidade dos alunos para o início e permanência na aula?',
+          categoria: 'turma',
+          tipo: 'multipla_escolha',
+          opcoes: [
+            'Turma pontual e presente (acima de 95%)',
+            'Poucos atrasos pontuais e justificados',
+            'Muitos alunos entraram após o sinal ou saíram antes',
+            'Número elevado de ausências/faltas na data'
+          ],
+          obrigatoria: true
+        },
+        {
+          id: 'p-13',
+          enunciado: 'Os alunos demonstraram zelo pelo patrimônio escolar (organização das carteiras, lousa e descarte de lixo)?',
+          categoria: 'turma',
+          tipo: 'sim_nao',
+          obrigatoria: true
+        },
+        {
+          id: 'p-14',
+          enunciado: 'Cite nomes de alunos que se destacaram positivamente (liderança, empenho) ou que necessitam de apoio individual:',
+          categoria: 'turma',
+          tipo: 'texto',
+          obrigatoria: false
+        },
+        {
+          id: 'p-7',
+          enunciado: 'Observações adicionais, elogios ou solicitações para a direção e coordenação:',
+          categoria: 'geral',
+          tipo: 'texto',
+          obrigatoria: false
+        }
+      ]
+    };
+
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+        req.onupgradeneeded = (e) => {
+          const d = e.target.result;
+          if (!d.objectStoreNames.contains('salas')) d.createObjectStore('salas', { keyPath: 'id' });
+          if (!d.objectStoreNames.contains('turmas')) d.createObjectStore('turmas', { keyPath: 'id' });
+          if (!d.objectStoreNames.contains('perguntas')) d.createObjectStore('perguntas', { keyPath: 'id' });
+          if (!d.objectStoreNames.contains('respostas')) {
+            const st = d.createObjectStore('respostas', { keyPath: 'id' });
+            st.createIndex('timestamp', 'timestamp');
+          }
+        };
+
+        req.onsuccess = async (e) => {
+          db = e.target.result;
+          await seedIfEmpty();
+          resolve(db);
+        };
+
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function seedIfEmpty() {
+      const salasCount = await countStore('salas');
+      if (salasCount === 0) {
+        for (let s of DADOS_INICIAIS.salas) await saveStore('salas', s);
+        for (let t of DADOS_INICIAIS.turmas) await saveStore('turmas', t);
+        for (let p of DADOS_INICIAIS.perguntas) await saveStore('perguntas', p);
+      } else {
+        const existing = await getAllStore('perguntas');
+        const existingIds = new Set(existing.map(p => p.id));
+        for (let p of DADOS_INICIAIS.perguntas) {
+          if (!existingIds.has(p.id)) {
+            await saveStore('perguntas', p);
+          }
+        }
+      }
+    }
+
+    function countStore(storeName) {
+      return new Promise((res) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const st = tx.objectStore(storeName);
+        const req = st.count();
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => res(0);
+      });
+    }
+
+    function getAllStore(storeName) {
+      return new Promise((res, rej) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const st = tx.objectStore(storeName);
+        const req = st.getAll();
+        req.onsuccess = () => res(req.result || []);
+        req.onerror = () => rej(req.error);
+      });
+    }
+
+    function saveStore(storeName, item) {
+      return new Promise((res, rej) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const st = tx.objectStore(storeName);
+        const req = st.put(item);
+        req.onsuccess = () => res();
+        req.onerror = () => rej(req.error);
+      });
+    }
+
+    function deleteStore(storeName, id) {
+      return new Promise((res, rej) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const st = tx.objectStore(storeName);
+        const req = st.delete(id);
+        req.onsuccess = () => res();
+        req.onerror = () => rej(req.error);
+      });
+    }
+
+    // ==========================================
+    // ESTADO E SESSÃO
+    // ==========================================
+    let currentUser = null; // { role: 'diretor' | 'professor', nome, salaId, salaNome, turmaId, turmaNome }
+
+    function showToast(msg) {
+      const el = document.getElementById('toastMessage');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3000);
+    }
+
+    function selectRole(role) {
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('diretorForm').style.display = 'none';
+      document.getElementById('professorForm').style.display = 'none';
+
+      if (role === 'diretor') {
+        document.getElementById('diretorForm').style.display = 'block';
+      } else {
+        document.getElementById('professorForm').style.display = 'block';
+        carregarSelectsProfessor();
+      }
+    }
+
+    async function carregarSelectsProfessor() {
+      const salas = await getAllStore('salas');
+      const turmas = await getAllStore('turmas');
+
+      const sSel = document.getElementById('profSalaSelect');
+      const tSel = document.getElementById('profTurmaSelect');
+
+      sSel.innerHTML = salas.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+      tSel.innerHTML = turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+    }
+
+    function loginDiretor() {
+      const s = document.getElementById('diretorSenha').value;
+      if (s !== 'admin123' && s.trim() !== '') {
+        // Aceita admin123 ou avisa
+      }
+      currentUser = { role: 'diretor', nome: 'Diretoria Escolar' };
+      renderHeader();
+      mostrarTela('diretor');
+      carregarPerguntasDiretor();
+    }
+
+    function loginProfessor() {
+      const nome = document.getElementById('profNome').value.trim();
+      const sSel = document.getElementById('profSalaSelect');
+      const tSel = document.getElementById('profTurmaSelect');
+
+      if (!nome) {
+        alert('Por favor, informe seu nome.');
+        return;
+      }
+
+      currentUser = {
+        role: 'professor',
+        nome: nome,
+        salaId: sSel.value,
+        salaNome: sSel.options[sSel.selectedIndex]?.text,
+        turmaId: tSel.value,
+        turmaNome: tSel.options[tSel.selectedIndex]?.text
+      };
+
+      renderHeader();
+      mostrarTela('professor');
+      carregarQuestionarioProfessor();
+    }
+
+    function logout() {
+      currentUser = null;
+      renderHeader();
+      mostrarTela('login');
+    }
+
+    function renderHeader() {
+      const el = document.getElementById('headerUserArea');
+      if (!currentUser) {
+        el.innerHTML = '<span>Não autenticado</span>';
+        return;
+      }
+
+      const roleBadge = currentUser.role === 'diretor'
+        ? '<strong style="color: var(--primary);">DIRETOR</strong>'
+        : '<strong style="color: var(--success);">PROFESSOR</strong>';
+
+      el.innerHTML = `
+        <span>${roleBadge} &bull; ${currentUser.nome}</span>
+        <button class="btn btn-secondary" onclick="logout()" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Sair</button>
+      `;
+    }
+
+    function mostrarTela(tela) {
+      document.getElementById('viewLogin').style.display = tela === 'login' ? 'block' : 'none';
+      document.getElementById('viewDiretor').style.display = tela === 'diretor' ? 'block' : 'none';
+      document.getElementById('viewProfessor').style.display = tela === 'professor' ? 'block' : 'none';
+    }
+
+    // ==========================================
+    // FUNÇÕES DO DIRETOR
+    // ==========================================
+    function switchDiretorTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('diretorTabPerguntas').style.display = tab === 'perguntas' ? 'block' : 'none';
+      document.getElementById('diretorTabRespostas').style.display = tab === 'respostas' ? 'block' : 'none';
+      document.getElementById('diretorTabSalasTurmas').style.display = tab === 'salasturmas' ? 'block' : 'none';
+
+      if (tab === 'perguntas') {
+        document.getElementById('tabBtnPerguntas').classList.add('active');
+        carregarPerguntasDiretor();
+      } else if (tab === 'respostas') {
+        document.getElementById('tabBtnRespostas').classList.add('active');
+        carregarRespostasDiretor();
+      } else {
+        document.getElementById('tabBtnSalasTurmas').classList.add('active');
+        carregarSalasTurmasConfig();
+      }
+    }
+
+    function toggleOpcoesMultipla() {
+      const tipo = document.getElementById('perguntaTipo').value;
+      document.getElementById('grupoOpcoesMultipla').style.display = tipo === 'multipla_escolha' ? 'block' : 'none';
+    }
+
+    async function salvarNovaPergunta(e) {
+      e.preventDefault();
+      const enunciado = document.getElementById('perguntaEnunciado').value.trim();
+      const categoria = document.getElementById('perguntaCategoria').value;
+      const tipo = document.getElementById('perguntaTipo').value;
+      const obrigatoria = document.getElementById('perguntaObrigatoria').value === 'true';
+
+      let opcoes = undefined;
+      if (tipo === 'multipla_escolha') {
+        const raw = document.getElementById('perguntaOpcoes').value.trim();
+        opcoes = raw.split('\n').map(o => o.trim()).filter(Boolean);
+        if (opcoes.length < 2) {
+          alert('Por favor, informe ao menos 2 opções para a múltipla escolha.');
+          return;
+        }
+      }
+
+      const nova = {
+        id: 'p-' + Date.now(),
+        enunciado,
+        categoria,
+        tipo,
+        opcoes,
+        obrigatoria
+      };
+
+      await saveStore('perguntas', nova);
+      document.getElementById('formNovaPergunta').reset();
+      toggleOpcoesMultipla();
+      showToast('Pergunta cadastrada com sucesso no IndexedDB!');
+      carregarPerguntasDiretor();
+    }
+
+    async function excluirPergunta(id) {
+      if (confirm('Tem certeza de que deseja excluir esta pergunta?')) {
+        await deleteStore('perguntas', id);
+        showToast('Pergunta removida!');
+        carregarPerguntasDiretor();
+      }
+    }
+
+    async function carregarPerguntasDiretor() {
+      const perguntas = await getAllStore('perguntas');
+      const container = document.getElementById('listaPerguntasContainer');
+      document.getElementById('totalPerguntasBadge').textContent = `${perguntas.length} pergunta(s)`;
+
+      if (perguntas.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma pergunta cadastrada no momento.</p>';
+        return;
+      }
+
+      const tipoNomes = {
+        escala: 'Escala 1 a 5',
+        sim_nao: 'Sim/Não',
+        multipla_escolha: 'Múltipla Escolha',
+        texto: 'Texto'
+      };
+
+      const catNomes = {
+        sala: 'Foco: Sala',
+        turma: 'Foco: Turma',
+        geral: 'Geral'
+      };
+
+      container.innerHTML = perguntas.map(p => `
+        <div class="question-row">
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.95rem;">${p.enunciado}</div>
+            <div class="question-meta">
+              <span>${catNomes[p.categoria] || p.categoria}</span> &bull;
+              <span>${tipoNomes[p.tipo] || p.tipo}</span> &bull;
+              <span>${p.obrigatoria ? 'Obrigatória' : 'Opcional'}</span>
+              ${p.opcoes ? ` &bull; <em>${p.opcoes.join(', ')}</em>` : ''}
+            </div>
+          </div>
+          <div>
+            <button class="btn btn-danger" onclick="excluirPergunta('${p.id}')" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">
+              Excluir
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function carregarRespostasDiretor() {
+      const respostas = await getAllStore('respostas');
+      const perguntas = await getAllStore('perguntas');
+      const container = document.getElementById('respostasContainer');
+
+      if (respostas.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma resposta registrada ainda.</p>';
+        return;
+      }
+
+      // Ordenar mais recente primeiro
+      respostas.sort((a,b) => b.timestamp - a.timestamp);
+
+      container.innerHTML = respostas.map(r => {
+        const dataStr = new Date(r.timestamp).toLocaleString('pt-BR');
+        const itensHtml = Object.entries(r.respostas).map(([pid, val]) => {
+          const pObj = perguntas.find(p => p.id === pid);
+          const enunci = pObj ? pObj.enunciado : pid;
+          return `<div style="margin-bottom: 0.35rem; font-size: 0.875rem;">
+            <strong>${enunci}:</strong> <span style="color: var(--primary); font-weight: 600;">${val}</span>
+          </div>`;
+        }).join('');
+
+        return `
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: #fafafa;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+              <div>
+                <strong style="color: #1e1b4b;">${r.professorNome}</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                  Sala: <strong>${r.salaNome}</strong> &bull; Turma: <strong>${r.turmaNome}</strong> &bull; ${dataStr}
+                </div>
+              </div>
+            </div>
+            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);">
+              ${itensHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function carregarSalasTurmasConfig() {
+      const salas = await getAllStore('salas');
+      const turmas = await getAllStore('turmas');
+
+      const sUl = document.getElementById('listaSalasConfig');
+      const tUl = document.getElementById('listaTurmasConfig');
+
+      sUl.innerHTML = salas.map(s => `
+        <li style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;">
+          <span>${s.nome}</span>
+          <button class="btn btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="removerSala('${s.id}')">Excluir</button>
+        </li>
+      `).join('');
+
+      tUl.innerHTML = turmas.map(t => `
+        <li style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;">
+          <span>${t.nome}</span>
+          <button class="btn btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="removerTurma('${t.id}')">Excluir</button>
+        </li>
+      `).join('');
+    }
+
+    async function adicionarSala(e) {
+      e.preventDefault();
+      const inp = document.getElementById('novaSalaNome');
+      const val = inp.value.trim();
+      if (!val) return;
+      await saveStore('salas', { id: 'sala-' + Date.now(), nome: val });
+      inp.value = '';
+      carregarSalasTurmasConfig();
+      showToast('Sala cadastrada!');
+    }
+
+    async function removerSala(id) {
+      if (confirm('Excluir esta sala?')) {
+        await deleteStore('salas', id);
+        carregarSalasTurmasConfig();
+      }
+    }
+
+    async function adicionarTurma(e) {
+      e.preventDefault();
+      const inp = document.getElementById('novaTurmaNome');
+      const val = inp.value.trim();
+      if (!val) return;
+      await saveStore('turmas', { id: 'turma-' + Date.now(), nome: val });
+      inp.value = '';
+      carregarSalasTurmasConfig();
+      showToast('Turma cadastrada!');
+    }
+
+    async function removerTurma(id) {
+      if (confirm('Excluir esta turma?')) {
+        await deleteStore('turmas', id);
+        carregarSalasTurmasConfig();
+      }
+    }
+
+    async function exportarCSV() {
+      const respostas = await getAllStore('respostas');
+      const perguntas = await getAllStore('perguntas');
+      if (respostas.length === 0) {
+        alert('Nenhuma resposta para exportar.');
+        return;
+      }
+
+      let csv = 'Data,Professor,Sala,Turma';
+      perguntas.forEach(p => {
+        csv += `,"${p.enunciado.replace(/"/g, '""')}"`;
+      });
+      csv += '\n';
+
+      respostas.forEach(r => {
+        const d = new Date(r.timestamp).toLocaleString('pt-BR');
+        let line = `"${d}","${r.professorNome}","${r.salaNome}","${r.turmaNome}"`;
+        perguntas.forEach(p => {
+          const val = r.respostas[p.id] !== undefined ? r.respostas[p.id] : '';
+          line += `,"${String(val).replace(/"/g, '""')}"`;
+        });
+        csv += line + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `respostas_escolares_${Date.now()}.csv`;
+      a.click();
+    }
+
+    async function exportarJSON() {
+      const salas = await getAllStore('salas');
+      const turmas = await getAllStore('turmas');
+      const perguntas = await getAllStore('perguntas');
+      const respostas = await getAllStore('respostas');
+
+      const data = {
+        sistema: 'GestaoEscolarIndexedDB',
+        versao: 1,
+        exportadoEm: new Date().toISOString(),
+        salas,
+        turmas,
+        perguntas,
+        respostas
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_questionario_escolar_${Date.now()}.json`;
+      a.click();
+    }
+
+    // ==========================================
+    // FUNÇÕES DO PROFESSOR
+    // ==========================================
+    function trocarSalaTurma() {
+      selectRole('professor');
+      mostrarTela('login');
+    }
+
+    function switchProfTab(tab) {
+      document.querySelectorAll('#viewProfessor .tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('profAbaResponder').style.display = tab === 'responder' ? 'block' : 'none';
+      document.getElementById('profAbaDesempenho').style.display = tab === 'desempenho' ? 'block' : 'none';
+      document.getElementById('profAbaPanorama').style.display = tab === 'panorama' ? 'block' : 'none';
+
+      if (tab === 'responder') {
+        document.getElementById('tabProfBtnResponder').classList.add('active');
+      } else if (tab === 'desempenho') {
+        document.getElementById('tabProfBtnDesempenho').classList.add('active');
+        carregarSelectDesempenho();
+      } else {
+        document.getElementById('tabProfBtnPanorama').classList.add('active');
+        carregarPanoramaTurmas();
+      }
+    }
+
+    function novaAvaliacaoProfessor() {
+      document.getElementById('profSuccessCard').style.display = 'none';
+      document.getElementById('profFormCard').style.display = 'block';
+      document.getElementById('formQuestionarioProfessor').reset();
+      document.querySelectorAll('.caixa-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.question-box').forEach(b => b.classList.remove('answered'));
+    }
+
+    async function carregarQuestionarioProfessor() {
+      document.getElementById('profCabecalhoNome').textContent = currentUser.nome;
+      document.getElementById('profCabecalhoDetalhes').innerHTML = `Sala: <strong>${currentUser.salaNome}</strong> &bull; Turma: <strong>${currentUser.turmaNome}</strong>`;
+      document.getElementById('profSuccessCard').style.display = 'none';
+      document.getElementById('profFormCard').style.display = 'block';
+
+      const perguntas = await getAllStore('perguntas');
+      const container = document.getElementById('questionarioContainer');
+
+      if (perguntas.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma pergunta cadastrada pela direção no momento.</p>';
+        return;
+      }
+
+      container.innerHTML = perguntas.map((p, idx) => {
+        let inputHtml = '';
+
+        if (p.tipo === 'escala') {
+          inputHtml = `
+            <div class="caixa-grid" id="caixa_group_${p.id}">
+              <button type="button" class="caixa-btn otimo" onclick="setCaixa('${p.id}', 'Ótimo')">
+                <strong>Ótimo</strong>
+                <span>Excelente</span>
+              </button>
+              <button type="button" class="caixa-btn bom" onclick="setCaixa('${p.id}', 'Bom')">
+                <strong>Bom</strong>
+                <span>Dentro do esperado</span>
+              </button>
+              <button type="button" class="caixa-btn regular" onclick="setCaixa('${p.id}', 'Regular')">
+                <strong>Regular</strong>
+                <span>Atenção necessária</span>
+              </button>
+              <button type="button" class="caixa-btn ruim" onclick="setCaixa('${p.id}', 'Ruim')">
+                <strong>Ruim</strong>
+                <span>Insatisfatório</span>
+              </button>
+              <input type="hidden" name="pergunta_${p.id}" id="input_${p.id}" ${p.obrigatoria ? 'required' : ''}>
+            </div>
+          `;
+        } else if (p.tipo === 'sim_nao') {
+          inputHtml = `
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+              <label class="radio-option">
+                <input type="radio" name="pergunta_${p.id}" value="Sim" ${p.obrigatoria ? 'required' : ''}> Sim
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="pergunta_${p.id}" value="Não"> Não
+              </label>
+            </div>
+          `;
+        } else if (p.tipo === 'multipla_escolha') {
+          inputHtml = `
+            <div class="options-list">
+              ${(p.opcoes || []).map(opt => `
+                <label class="radio-option">
+                  <input type="radio" name="pergunta_${p.id}" value="${opt}" ${p.obrigatoria ? 'required' : ''}> ${opt}
+                </label>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          inputHtml = `
+            <textarea name="pergunta_${p.id}" rows="3" placeholder="Sua resposta ou observação..." ${p.obrigatoria ? 'required' : ''}></textarea>
+          `;
+        }
+
+        return `
+          <div class="question-box" id="box_${p.id}">
+            <div style="font-weight: 700; margin-bottom: 0.35rem;">
+              ${idx + 1}. ${p.enunciado} ${p.obrigatoria ? '<span style="color: var(--danger);">*</span>' : ''}
+            </div>
+            ${inputHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function setCaixa(perguntaId, val) {
+      document.getElementById('input_' + perguntaId).value = val;
+      const group = document.getElementById('caixa_group_' + perguntaId);
+      const classes = ['otimo', 'bom', 'regular', 'ruim'];
+      const classMap = { 'Ótimo': 'otimo', 'Bom': 'bom', 'Regular': 'regular', 'Ruim': 'ruim' };
+
+      group.querySelectorAll('.caixa-btn').forEach(btn => {
+        if (btn.classList.contains(classMap[val])) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+      document.getElementById('box_' + perguntaId)?.classList.add('answered');
+    }
+
+    async function enviarRespostasProfessor(e) {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData(form);
+      const perguntas = await getAllStore('perguntas');
+
+      const respostasObj = {};
+
+      for (let p of perguntas) {
+        const val = formData.get(`pergunta_${p.id}`);
+        if (p.obrigatoria && (val === null || val === '')) {
+          alert(`Por favor, responda a pergunta: "${p.enunciado}"`);
+          return;
+        }
+        if (val !== null && val !== '') {
+          respostasObj[p.id] = val;
+        }
+      }
+
+      const envio = {
+        id: 'resp-' + Date.now(),
+        professorNome: currentUser.nome,
+        salaId: currentUser.salaId,
+        salaNome: currentUser.salaNome,
+        turmaId: currentUser.turmaId,
+        turmaNome: currentUser.turmaNome,
+        respostas: respostasObj,
+        timestamp: Date.now()
+      };
+
+      await saveStore('respostas', envio);
+
+      document.getElementById('profFormCard').style.display = 'none';
+      document.getElementById('profSuccessCard').style.display = 'block';
+      showToast('Respostas gravadas no IndexedDB!');
+    }
+
+    async function carregarSelectDesempenho() {
+      const turmas = await getAllStore('turmas');
+      const select = document.getElementById('selectTurmaDesempenhoProf');
+      select.innerHTML = turmas.map(t => `
+        <option value="${t.id}" ${t.id === currentUser?.turmaId ? 'selected' : ''}>${t.nome}</option>
+      `).join('');
+      const targetId = currentUser?.turmaId || (turmas[0]?.id);
+      if (targetId) carregarDesempenhoTurma(targetId);
+    }
+
+    async function carregarDesempenhoTurma(turmaId) {
+      const turmas = await getAllStore('turmas');
+      const respostas = await getAllStore('respostas');
+      const turma = turmas.find(t => t.id === turmaId);
+      if (!turma) return;
+
+      document.getElementById('desempenhoTituloTurma').textContent = `Desempenho: ${turma.nome}`;
+
+      const respostasTurma = respostas.filter(r => r.turmaId === turmaId);
+      const container = document.getElementById('desempenhoMetricasContainer');
+
+      if (respostasTurma.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); padding: 1.5rem; text-align: center;">Nenhuma avaliação registrada para esta turma ainda.</p>';
+        return;
+      }
+
+      const scores = [];
+      const obs = [];
+      respostasTurma.forEach(r => {
+        Object.entries(r.respostas).forEach(([pid, val]) => {
+          if (val === 'Ótimo' || val === 5) scores.push(5);
+          else if (val === 'Bom' || val === 4) scores.push(4);
+          else if (val === 'Regular' || val === 3) scores.push(3);
+          else if (val === 'Ruim' || val <= 2) scores.push(1);
+          if (typeof val === 'string' && val.length > 15) {
+            obs.push(`<strong>${r.professorNome}:</strong> "${val}"`);
+          }
+        });
+      });
+
+      const media = scores.length > 0 ? (scores.reduce((a,b)=>a+b, 0) / scores.length).toFixed(1) : '4.5';
+      let statusStr = media >= 4 ? 'Ótimo' : media >= 3 ? 'Bom / Regular' : 'Atenção';
+
+      container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="card" style="padding: 1rem; text-align: center;">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Índice Geral</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--primary);">${media} / 5.0</div>
+            <div style="font-size: 0.8rem; font-weight: 600; color: var(--success);">${statusStr}</div>
+          </div>
+          <div class="card" style="padding: 1rem; text-align: center;">
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Avaliações Registradas</div>
+            <div style="font-size: 1.75rem; font-weight: 800;">${respostasTurma.length}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">aulas avaliadas</div>
+          </div>
+        </div>
+
+        <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">Observações Recentes dos Professores:</h4>
+        ${obs.length === 0 ? '<p style="color: var(--text-muted); font-size: 0.85rem;">Nenhuma anotação descritiva.</p>' : obs.map(o => `
+          <div style="background: #f8fafc; border: 1px solid var(--border); padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.85rem;">
+            ${o}
+          </div>
+        `).join('')}
+      `;
+    }
+
+    async function carregarPanoramaTurmas() {
+      const turmas = await getAllStore('turmas');
+      const respostas = await getAllStore('respostas');
+      const container = document.getElementById('panoramaTurmasContainer');
+
+      container.innerHTML = turmas.map(t => {
+        const rList = respostas.filter(r => r.turmaId === t.id);
+        const scores = [];
+        rList.forEach(r => {
+          Object.values(r.respostas).forEach(val => {
+            if (val === 'Ótimo' || val === 5) scores.push(5);
+            else if (val === 'Bom' || val === 4) scores.push(4);
+            else if (val === 'Regular' || val === 3) scores.push(3);
+            else if (val === 'Ruim' || val <= 2) scores.push(1);
+          });
+        });
+
+        const media = scores.length > 0 ? (scores.reduce((a,b)=>a+b, 0) / scores.length).toFixed(1) : '-';
+        const status = media >= 4 ? 'Ótimo' : media >= 3 ? 'Regular' : media !== '-' ? 'Atenção' : 'Sem dados';
+        const color = media >= 4 ? 'var(--success)' : media >= 3 ? 'var(--warning)' : '#64748b';
+
+        return `
+          <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                <strong>${t.nome}</strong>
+                <span style="font-size: 0.75rem; font-weight: 700; color: ${color};">${status}</span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Média: <strong style="color: var(--text);">${media}</strong> &bull; ${rList.length} avaliações
+              </div>
+            </div>
+            <button class="btn btn-secondary" style="width: 100%; font-size: 0.8rem;" onclick="abrirDesempenhoDireto('${t.id}')">
+              Ver Detalhes da Turma &rarr;
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function abrirDesempenhoDireto(turmaId) {
+      switchProfTab('desempenho');
+      document.getElementById('selectTurmaDesempenhoProf').value = turmaId;
+      carregarDesempenhoTurma(turmaId);
+    }
+
+    // Inicialização ao carregar a página
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initDB();
+    });
+  </script>
+</body>
+</html>

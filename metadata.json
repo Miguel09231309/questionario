@@ -1,0 +1,6 @@
+{
+  "name": "Gestão Escolar - Questionário de Salas & Turmas",
+  "description": "Sistema escolar completo para diretores cadastrarem perguntas sobre salas e turmas e professores responderem, com banco de dados IndexedDB.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

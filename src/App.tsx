@@ -215,8 +215,8 @@ export default function App() {
 
   const handleDownloadHtml = () => {
     const link = document.createElement('a');
-    link.href = '/questionario.html';
-    link.download = 'questionario-escolar.html';
+    link.href = '/public/index.html';
+    link.download = 'index.html';
     link.click();
   };
 

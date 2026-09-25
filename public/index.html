@@ -1,4 +1,3 @@
-<!-- Mesma versão autônoma completa que public/index.html -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -42,6 +41,7 @@
   </script>
 
   <style>
+    /* Transições suaves */
     .btn-caixa.active-otimo {
       background-color: #10b981 !important;
       border-color: #059669 !important;
@@ -72,7 +72,9 @@
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen flex flex-col selection:bg-indigo-100 selection:text-indigo-900">
 
-  <!-- CABEÇALHO GLOBAL -->
+  <!-- ============================================================== -->
+  <!-- CABEÇALHO GLOBAL                                               -->
+  <!-- ============================================================== -->
   <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -98,10 +100,14 @@
     </div>
   </header>
 
-  <!-- CONTEÚDO PRINCIPAL -->
+  <!-- ============================================================== -->
+  <!-- CONTEÚDO PRINCIPAL                                             -->
+  <!-- ============================================================== -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
-    <!-- TELA 1: LOGIN -->
+    <!-- ============================================================== -->
+    <!-- TELA 1: LOGIN (DIRETOR OU PROFESSOR)                           -->
+    <!-- ============================================================== -->
     <div id="viewLogin" class="max-w-4xl mx-auto">
       <div class="text-center mb-8">
         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-indigo-700 mb-3">
@@ -215,8 +221,11 @@
       </div>
     </div>
 
-    <!-- TELA 2: ÁREA DO DIRETOR -->
+    <!-- ============================================================== -->
+    <!-- TELA 2: ÁREA DO DIRETOR (ADMIN)                                -->
+    <!-- ============================================================== -->
     <div id="viewDiretor" class="hidden">
+      <!-- Barra de Abas do Diretor -->
       <div class="flex items-center gap-2 border-b border-slate-200 mb-6 overflow-x-auto">
         <button id="tabDirBtnPerguntas" onclick="switchDiretorTab('perguntas')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-indigo-600 text-indigo-700 transition-colors whitespace-nowrap cursor-pointer">
           <i data-lucide="help-circle" class="w-4 h-4"></i>
@@ -234,6 +243,7 @@
 
       <!-- ABA DIRETOR: PERGUNTAS -->
       <div id="diretorAbaPerguntas" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Form Nova Pergunta -->
         <div class="lg:col-span-5">
           <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs sticky top-24">
             <h3 class="text-base font-bold text-slate-900 mb-1">Cadastrar Nova Pergunta</h3>
@@ -283,6 +293,7 @@
           </div>
         </div>
 
+        <!-- Lista de Perguntas Cadastradas -->
         <div class="lg:col-span-7">
           <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs">
             <div class="flex items-center justify-between mb-4">
@@ -293,7 +304,9 @@
               <span id="badgeTotalPerguntas" class="text-xs font-mono text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">0 perguntas</span>
             </div>
 
-            <div id="containerPerguntasDir" class="divide-y divide-slate-100"></div>
+            <div id="containerPerguntasDir" class="divide-y divide-slate-100">
+              <!-- Renderizado via JS -->
+            </div>
           </div>
         </div>
       </div>
@@ -317,7 +330,9 @@
           </div>
         </div>
 
-        <div id="containerRespostasDir" class="space-y-3"></div>
+        <div id="containerRespostasDir" class="space-y-3">
+          <!-- Renderizado via JS -->
+        </div>
       </div>
 
       <!-- ABA DIRETOR: SALAS & TURMAS -->
@@ -344,8 +359,11 @@
       </div>
     </div>
 
-    <!-- TELA 3: ÁREA DO PROFESSOR -->
+    <!-- ============================================================== -->
+    <!-- TELA 3: ÁREA DO PROFESSOR                                      -->
+    <!-- ============================================================== -->
     <div id="viewProfessor" class="hidden max-w-4xl mx-auto space-y-6">
+      <!-- Card Contexto do Professor -->
       <div class="bg-gradient-to-r from-emerald-700 via-teal-800 to-indigo-900 rounded-2xl p-5 sm:p-6 text-white shadow-xs">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -365,6 +383,7 @@
         </div>
       </div>
 
+      <!-- Barra de Abas do Professor (Responder / Desempenho / Panorama) -->
       <div class="flex items-center gap-2 border-b border-slate-200 overflow-x-auto">
         <button id="profTabBtnResponder" onclick="switchProfTab('responder')" class="flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 border-emerald-600 text-emerald-700 transition-colors whitespace-nowrap cursor-pointer">
           <i data-lucide="clipboard-list" class="w-4 h-4"></i>
@@ -382,6 +401,7 @@
 
       <!-- ABA PROFESSOR 1: RESPONDER -->
       <div id="profAbaResponder">
+        <!-- Recibo de Sucesso pós-envio com botões diretos -->
         <div id="profReciboSucesso" class="hidden bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 text-center shadow-xs">
           <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
             <i data-lucide="check-circle-2" class="w-8 h-8"></i>
@@ -416,9 +436,12 @@
           </div>
         </div>
 
+        <!-- Formulário de Perguntas -->
         <div id="profFormContainer" class="space-y-4">
           <form id="formQuestionarioProf" onsubmit="enviarRespostasProf(event)" class="space-y-4">
-            <div id="listaPerguntasProf" class="space-y-4"></div>
+            <div id="listaPerguntasProf" class="space-y-4">
+              <!-- Renderizado via JS -->
+            </div>
 
             <div class="pt-4 text-right">
               <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2">
@@ -443,7 +466,9 @@
           </div>
         </div>
 
-        <div id="metricasDesempenhoTurmaContainer"></div>
+        <div id="metricasDesempenhoTurmaContainer">
+          <!-- Renderizado via JS -->
+        </div>
       </div>
 
       <!-- ABA PROFESSOR 3: PANORAMA DAS TURMAS -->
@@ -453,13 +478,21 @@
           <p class="text-xs text-slate-500">Visão panorâmica do termômetro de aproveitamento e conduta escolar.</p>
         </div>
 
-        <div id="gridPanoramaTurmas" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div id="gridPanoramaTurmas" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Renderizado via JS -->
+        </div>
       </div>
     </div>
   </main>
 
+  <!-- ============================================================== -->
+  <!-- TOAST DE NOTIFICAÇÃO                                           -->
+  <!-- ============================================================== -->
   <div id="toastMessage" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl transition-all hidden"></div>
 
+  <!-- ============================================================== -->
+  <!-- FOOTER                                                         -->
+  <!-- ============================================================== -->
   <footer class="bg-white border-t border-slate-200 py-6 mt-12 text-center text-xs text-slate-500">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
       <div>Colégio Saber Ativo &bull; Sistema Escolar Autônomo com IndexedDB</div>
@@ -467,11 +500,15 @@
     </div>
   </footer>
 
+  <!-- ============================================================== -->
+  <!-- JAVASCRIPT: BANCO DE DADOS INDEXEDDB & LÓGICA DO APP           -->
+  <!-- ============================================================== -->
   <script>
     const DB_NAME = 'EscolaQuestionarioDB';
     const DB_VERSION = 1;
     let db;
 
+    // Dados Iniciais Padrão
     const DADOS_INICIAIS = {
       salas: [
         { id: 'sala-1', nome: 'Sala 101 - Bloco A' },
@@ -596,6 +633,7 @@
       ]
     };
 
+    // Inicialização IndexedDB
     function initDB() {
       return new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -629,6 +667,7 @@
         for (let p of DADOS_INICIAIS.perguntas) await saveStore('perguntas', p);
         for (let r of DADOS_INICIAIS.respostas) await saveStore('respostas', r);
       } else {
+        // Garantir que novas perguntas padrão existam
         const existingP = await getAllStore('perguntas');
         const ids = new Set(existingP.map(x => x.id));
         for (let p of DADOS_INICIAIS.perguntas) {
@@ -667,7 +706,8 @@
       });
     }
 
-    let currentUser = null;
+    // Variáveis de Sessão
+    let currentUser = null; // { role: 'diretor' | 'professor', nome, salaId, salaNome, turmaId, turmaNome }
 
     function showToast(msg) {
       const t = document.getElementById('toastMessage');
@@ -676,13 +716,16 @@
       setTimeout(() => t.classList.add('hidden'), 3000);
     }
 
+    // Login Diretor
     function loginComoDiretor() {
+      const s = document.getElementById('loginDiretorSenha').value;
       currentUser = { role: 'diretor', nome: 'Diretoria Escolar' };
       renderHeader();
       mostrarTela('diretor');
       carregarPerguntasDir();
     }
 
+    // Login Professor
     async function loginComoProfessor() {
       const nome = document.getElementById('loginProfNome').value.trim();
       const sSel = document.getElementById('loginProfSala');
@@ -751,6 +794,9 @@
       document.getElementById('loginProfTurma').innerHTML = turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
     }
 
+    // ==========================================
+    // LÓGICA DO DIRETOR
+    // ==========================================
     function switchDiretorTab(tab) {
       const tabs = ['perguntas', 'respostas', 'salasturmas'];
       tabs.forEach(t => {
@@ -979,6 +1025,9 @@
       a.click();
     }
 
+    // ==========================================
+    // LÓGICA DO PROFESSOR (COM CAIXAS, DESEMPENHO E PANORAMA)
+    // ==========================================
     function switchProfTab(tab) {
       const tabs = ['responder', 'desempenho', 'panorama'];
       tabs.forEach(t => {
@@ -1028,6 +1077,7 @@
         let inputHtml = '';
 
         if (p.tipo === 'escala') {
+          // FORMULÁRIO DE CAIXAS SOLICITADO: Ótimo / Bom / Regular / Ruim
           inputHtml = `
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2" id="caixa_group_${p.id}">
               <button type="button" onclick="selecionarCaixa('${p.id}', 'Ótimo')" class="btn-caixa p-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-left transition-all cursor-pointer flex flex-col justify-between hover:border-slate-300">
@@ -1139,12 +1189,14 @@
 
       await saveStore('respostas', envio);
 
+      // Mostra recibo de sucesso imediatamente
       document.getElementById('profFormContainer').classList.add('hidden');
       document.getElementById('profReciboSucesso').classList.remove('hidden');
       showToast('Respostas gravadas no IndexedDB!');
       lucide.createIcons();
     }
 
+    // Desempenho da Turma
     async function popularSelectDesempenho() {
       const turmas = await getAllStore('turmas');
       const sel = document.getElementById('selectTurmaDesempenho');
@@ -1218,6 +1270,7 @@
       lucide.createIcons();
     }
 
+    // Panorama das Turmas
     async function renderizarPanoramaTurmas() {
       const turmas = await getAllStore('turmas');
       const respostas = await getAllStore('respostas');
@@ -1266,6 +1319,7 @@
       renderizarDesempenhoTurma(turmaId);
     }
 
+    // Inicialização da Página
     window.addEventListener('DOMContentLoaded', async () => {
       await initDB();
       await popularSelectsLogin();

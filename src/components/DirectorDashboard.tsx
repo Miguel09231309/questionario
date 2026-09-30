@@ -37,7 +37,6 @@ interface DirectorDashboardProps {
   onResetDefaults: () => Promise<void>;
   onExportCsv: () => void;
   onExportJson: () => void;
-  onDownloadHtml: () => void;
 }
 
 export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({
@@ -55,7 +54,6 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({
   onResetDefaults,
   onExportCsv,
   onExportJson,
-  onDownloadHtml,
 }) => {
   const [activeTab, setActiveTab] = useState<'perguntas' | 'respostas' | 'salas_turmas' | 'database'>('perguntas');
 
@@ -112,7 +110,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({
       });
 
       setNovoEnunciado('');
-      setFeedbackMsg('Pergunta cadastrada com sucesso no IndexedDB!');
+      setFeedbackMsg('Pergunta cadastrada com sucesso no Banco de Dados!');
       setTimeout(() => setFeedbackMsg(''), 4000);
     } finally {
       setIsSubmittingQuestion(false);
@@ -778,77 +776,86 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB 4: BANCO DE DADOS (INDEXEDDB) */}
+      {/* TAB 4: BANCO DE DADOS (FIRESTORE & OFFLINE) */}
       {activeTab === 'database' && (
         <div className="mt-6 max-w-4xl space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                 <Database className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
-                  Arquitetura do Banco de Dados: IndexedDB
+                  Banco de Dados em Nuvem: Firebase Firestore & Sincronização em Tempo Real
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Banco transacional assíncrono nativo do navegador (Name: <code>EscolaQuestionarioDB</code>, v1).
+                  Infraestrutura NoSQL serverless distribuída com replicação automática e escuta de eventos via WebSockets.
                 </p>
               </div>
             </div>
 
             <p className="text-xs sm:text-sm text-slate-600 mt-4 leading-relaxed">
-              O IndexedDB é o mecanismo mais robusto de armazenamento local na Web moderna. Ao contrário do simples <code className="bg-slate-100 px-1 py-0.5 rounded">localStorage</code> (que é síncrono e limitado a 5MB de strings), o IndexedDB suporta transações atômicas ACID, índices por múltiplos campos e grandes volumes de respostas sem degradar a interface.
+              O sistema utiliza o <strong>Firebase Firestore</strong> como banco de dados principal de produção. Todas as alterações efetuadas pela coordenação ou respostas submetidas pelos professores são sincronizadas instantaneamente com listeners em tempo real (<code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-700">onSnapshot</code>), contando também com camada de contingência local para operação offline ininterrupta.
             </p>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase">Store: perguntas</span>
-                <div className="text-lg font-bold text-slate-900 font-mono tabular-nums">{perguntas.length} itens</div>
-                <p className="text-[11px] text-slate-500">Índices: categoria, ordem</p>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase">Coleção: perguntas</span>
+                <div className="text-lg font-bold text-indigo-700 font-mono tabular-nums">{perguntas.length} documentos</div>
+                <p className="text-[11px] text-slate-500">Perguntas ativas e regras</p>
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase">Store: respostas</span>
-                <div className="text-lg font-bold text-slate-900 font-mono tabular-nums">{respostas.length} itens</div>
-                <p className="text-[11px] text-slate-500">Índices: sala, turma, timestamp</p>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase">Coleção: respostas</span>
+                <div className="text-lg font-bold text-emerald-700 font-mono tabular-nums">{respostas.length} documentos</div>
+                <p className="text-[11px] text-slate-500">Histórico de avaliações</p>
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase">Store: salas</span>
-                <div className="text-lg font-bold text-slate-900 font-mono tabular-nums">{salas.length} itens</div>
-                <p className="text-[11px] text-slate-500">Salas físicas cadastradas</p>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase">Coleção: salas</span>
+                <div className="text-lg font-bold text-slate-900 font-mono tabular-nums">{salas.length} documentos</div>
+                <p className="text-[11px] text-slate-500">Espaços físicos e blocos</p>
               </div>
 
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase">Store: turmas</span>
-                <div className="text-lg font-bold text-slate-900 font-mono tabular-nums">{turmas.length} itens</div>
-                <p className="text-[11px] text-slate-500">Séries e turnos escolares</p>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase">Coleção: turmas</span>
+                <div className="text-lg font-bold text-slate-900 font-mono tabular-nums">{turmas.length} documentos</div>
+                <p className="text-[11px] text-slate-500">Séries e turnos letivos</p>
               </div>
             </div>
 
             <div className="mt-8 pt-6 border-t border-slate-200 flex flex-wrap gap-4 items-center justify-between">
               <div>
-                <h4 className="text-sm font-bold text-slate-800">Versão Autônoma em Arquivo Único</h4>
+                <h4 className="text-sm font-bold text-slate-800">Exportação e Cópia de Segurança (Backup)</h4>
                 <p className="text-xs text-slate-500">
-                  Baixe o código HTML pronto com CSS + JS + IndexedDB integrados para rodar sem servidor.
+                  Exporte o banco de dados completo em formato JSON ou CSV para arquivamento ou análise externa.
                 </p>
               </div>
-              <button
-                onClick={onDownloadHtml}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-2 cursor-pointer shadow-xs"
-              >
-                <Download className="w-4 h-4" />
-                <span>Baixar questionario.html</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onExportJson}
+                  className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Backup JSON</span>
+                </button>
+                <button
+                  onClick={onExportCsv}
+                  className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Planilha CSV</span>
+                </button>
+              </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-slate-200 flex flex-wrap gap-3">
+            <div className="mt-6 pt-6 border-t border-slate-200 flex flex-wrap gap-3 items-center justify-between">
               <button
                 onClick={onResetDefaults}
                 className="px-3.5 py-2 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Restaurar Dados e Perguntas Iniciais</span>
+                <span>Restaurar Dados e Perguntas Padrão</span>
               </button>
             </div>
           </div>
@@ -871,7 +878,7 @@ export const DirectorDashboard: React.FC<DirectorDashboardProps> = ({
               <strong className="text-slate-900 mt-1 block italic">"{perguntaParaExcluir.enunciado}"</strong>
             </p>
             <p className="text-xs text-slate-500 mb-6">
-              Esta ação removerá a pergunta do IndexedDB e ela não será mais exibida para os professores.
+              Esta ação removerá a pergunta do banco de dados na nuvem e ela não será mais exibida para os professores.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button

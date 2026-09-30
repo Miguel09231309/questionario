@@ -7,14 +7,12 @@ interface LoginViewProps {
   salas: Sala[];
   turmas: Turma[];
   onLogin: (session: UserSession) => void;
-  onDownloadHtml: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
   salas,
   turmas,
   onLogin,
-  onDownloadHtml,
 }) => {
   const [selectedRole, setSelectedRole] = useState<'diretor' | 'professor' | null>(null);
 
@@ -71,29 +69,29 @@ export const LoginView: React.FC<LoginViewProps> = ({
       <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs mb-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
           <div className="p-6 sm:p-10 lg:col-span-7">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-indigo-700 mb-4">
-              <Sparkles className="w-3.5 h-3.5" />
-              Banco de Dados IndexedDB Integrado
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800 mb-4">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Banco de Dados em Nuvem: Firebase Firestore Sincronizado
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight text-balance leading-tight">
               Portal de Avaliação Contínua de Salas e Turmas
             </h1>
             <p className="mt-3 text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
-              Ambiente unificado para a gestão escolar: a direção cadastra perguntas e monitora a infraestrutura e turmas, enquanto os professores registram suas observações diárias.
+              Ambiente unificado para a gestão escolar: a direção cadastra perguntas e monitora a infraestrutura e turmas em tempo real, enquanto os professores registram suas observações pedagógicas.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-slate-500 font-medium">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Sem necessidade de servidor externo
+                Sincronização em Nuvem em Tempo Real
               </span>
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Persistência local no navegador
+                Acesso Seguro com Perfis Distintos
               </span>
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Exportação CSV & Backup
+                Relatórios e Exportação CSV & JSON
               </span>
             </div>
           </div>
@@ -348,29 +346,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </button>
           )}
         </div>
-      </div>
-
-      {/* Offline HTML banner info */}
-      <div className="mt-8 p-4 bg-slate-100/80 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-            <Building2 className="w-4 h-4" />
-          </div>
-          <div>
-            <h4 className="text-xs font-bold text-slate-800">
-              Precisa de um único arquivo HTML para rodar offline?
-            </h4>
-            <p className="text-xs text-slate-500">
-              Você pode baixar o <code className="font-semibold text-slate-700">questionario.html</code> completo com banco IndexedDB autônomo.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={onDownloadHtml}
-          className="px-3.5 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-indigo-700 border border-slate-200 rounded-lg shadow-2xs transition-colors shrink-0 cursor-pointer"
-        >
-          Baixar Arquivo .html
-        </button>
       </div>
     </div>
   );

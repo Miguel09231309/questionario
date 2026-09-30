@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "Sala": {
+      "title": "Sala",
+      "description": "Espaço físico ou sala de aula avaliada na instituição escolar",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único da sala",
+          "maxLength": 100
+        },
+        "nome": {
+          "type": "string",
+          "description": "Nome ou identificação da sala",
+          "maxLength": 120
+        },
+        "bloco": {
+          "type": "string",
+          "description": "Bloco ou prédio onde a sala está localizada",
+          "maxLength": 60
+        },
+        "capacidade": {
+          "type": "number",
+          "description": "Capacidade máxima de alunos na sala"
+        }
+      },
+      "required": ["id", "nome"]
+    },
+    "Turma": {
+      "title": "Turma",
+      "description": "Turma ou série avaliada pelos professores",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único da turma",
+          "maxLength": 100
+        },
+        "nome": {
+          "type": "string",
+          "description": "Nome da turma (Ex: 6º Ano A)",
+          "maxLength": 120
+        },
+        "turno": {
+          "type": "string",
+          "description": "Turno escolar",
+          "enum": ["Manhã", "Tarde", "Noite", "Integral"]
+        }
+      },
+      "required": ["id", "nome", "turno"]
+    },
+    "Pergunta": {
+      "title": "Pergunta",
+      "description": "Pergunta do questionário cadastrada pela direção",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único da pergunta",
+          "maxLength": 100
+        },
+        "enunciado": {
+          "type": "string",
+          "description": "Texto do enunciado da pergunta",
+          "maxLength": 500
+        },
+        "categoria": {
+          "type": "string",
+          "description": "Categoria do foco da pergunta",
+          "enum": ["sala", "turma", "geral"]
+        },
+        "tipo": {
+          "type": "string",
+          "description": "Tipo de resposta admitida",
+          "enum": ["escala", "multipla_escolha", "sim_nao", "texto"]
+        },
+        "opcoes": {
+          "type": "array",
+          "description": "Lista de opções para tipo múltipla escolha"
+        },
+        "obrigatoria": {
+          "type": "boolean",
+          "description": "Indica se o preenchimento é obrigatório"
+        },
+        "ativa": {
+          "type": "boolean",
+          "description": "Indica se a pergunta está ativa no formulário"
+        },
+        "ordem": {
+          "type": "number",
+          "description": "Posição ordinal da pergunta na visualização"
+        },
+        "criadaEm": {
+          "type": "string",
+          "description": "Data ISO de criação"
+        }
+      },
+      "required": ["id", "enunciado", "categoria", "tipo", "obrigatoria", "ordem"]
+    },
+    "RespostaEnvio": {
+      "title": "RespostaEnvio",
+      "description": "Registro de avaliação submetido por um professor",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identificador único do envio de resposta",
+          "maxLength": 100
+        },
+        "professorNome": {
+          "type": "string",
+          "description": "Nome do professor e disciplina",
+          "maxLength": 150
+        },
+        "salaId": {
+          "type": "string",
+          "description": "Identificador da sala avaliada",
+          "maxLength": 100
+        },
+        "salaNome": {
+          "type": "string",
+          "description": "Nome da sala no momento da resposta",
+          "maxLength": 120
+        },
+        "turmaId": {
+          "type": "string",
+          "description": "Identificador da turma avaliada",
+          "maxLength": 100
+        },
+        "turmaNome": {
+          "type": "string",
+          "description": "Nome da turma no momento da resposta",
+          "maxLength": 120
+        },
+        "respostas": {
+          "type": "object",
+          "description": "Dicionário de ID da pergunta para valor respondido"
+        },
+        "observacoesGerais": {
+          "type": "string",
+          "description": "Observações adicionais do docente",
+          "maxLength": 2000
+        },
+        "criadaEm": {
+          "type": "string",
+          "description": "Data ISO da submissão"
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Timestamp Unix em milissegundos"
+        }
+      },
+      "required": ["id", "professorNome", "salaId", "turmaId", "respostas", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/salas/{salaId}": {
+      "schema": "Sala",
+      "description": "Coleção de salas e ambientes físicos da escola"
+    },
+    "/turmas/{turmaId}": {
+      "schema": "Turma",
+      "description": "Coleção de turmas e classes escolares"
+    },
+    "/perguntas/{perguntaId}": {
+      "schema": "Pergunta",
+      "description": "Perguntas de avaliação configuradas pela gestão escolar"
+    },
+    "/respostas/{respostaId}": {
+      "schema": "RespostaEnvio",
+      "description": "Envios e avaliações dos professores gravadas em tempo real"
+    }
+  }
+}

@@ -5,7 +5,7 @@ import { Header } from './components/Header';
 import { LoginView } from './components/LoginView';
 import { DirectorDashboard } from './components/DirectorDashboard';
 import { TeacherView } from './components/TeacherView';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Database, AlertCircle } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState<UserSession | null>(() => {
@@ -22,29 +22,79 @@ export default function App() {
   const [salas, setSalas] = useState<Sala[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dbInfo, setDbInfo] = useState<{
+    isCloud: boolean;
+    projectId?: string;
+    statusLabel: string;
+  }>({
+    isCloud: true,
+    statusLabel: 'Conectando ao Firebase Firestore...',
+  });
 
-  // Load all initial data from IndexedDB
-  const carregarDadosDoBanco = async () => {
-    try {
-      const [pList, rList, sList, tList] = await Promise.all([
-        dbService.getPerguntas(),
-        dbService.getRespostas(),
-        dbService.getSalas(),
-        dbService.getTurmas(),
-      ]);
-      setPerguntas(pList);
-      setRespostas(rList);
-      setSalas(sList);
-      setTurmas(tList);
-    } catch (e) {
-      console.error('Erro ao carregar dados do IndexedDB:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Real-time synchronization setup
   useEffect(() => {
-    carregarDadosDoBanco();
+    let unsubSalas = () => {};
+    let unsubTurmas = () => {};
+    let unsubPerguntas = () => {};
+    let unsubRespostas = () => {};
+
+    const startSync = async () => {
+      try {
+        await dbService.init();
+        const info = dbService.getDatabaseInfo();
+        setDbInfo({
+          isCloud: info.isCloud,
+          projectId: info.projectId,
+          statusLabel: info.statusLabel,
+        });
+
+        // Set up real-time snapshot listeners
+        unsubSalas = dbService.subscribeSalas((list) => {
+          setSalas(list);
+          setIsLoading(false);
+        });
+
+        unsubTurmas = dbService.subscribeTurmas((list) => {
+          setTurmas(list);
+        });
+
+        unsubPerguntas = dbService.subscribePerguntas((list) => {
+          setPerguntas(list);
+        });
+
+        unsubRespostas = dbService.subscribeRespostas((list) => {
+          setRespostas(list);
+        });
+      } catch (err) {
+        console.error('Falha ao inicializar sincronização com Firestore:', err);
+        // Fallback to one-off read
+        try {
+          const [pList, rList, sList, tList] = await Promise.all([
+            dbService.getPerguntas(),
+            dbService.getRespostas(),
+            dbService.getSalas(),
+            dbService.getTurmas(),
+          ]);
+          setPerguntas(pList);
+          setRespostas(rList);
+          setSalas(sList);
+          setTurmas(tList);
+        } catch (fallbackErr) {
+          console.error('Falha no fallback:', fallbackErr);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    startSync();
+
+    return () => {
+      unsubSalas();
+      unsubTurmas();
+      unsubPerguntas();
+      unsubRespostas();
+    };
   }, []);
 
   const handleLogin = (userSession: UserSession) => {
@@ -70,14 +120,10 @@ export default function App() {
       criadaEm: new Date().toISOString(),
     };
     await dbService.salvarPergunta(nova);
-    const atualizadas = await dbService.getPerguntas();
-    setPerguntas(atualizadas);
   };
 
   const handleDeletePergunta = async (id: string) => {
     await dbService.excluirPergunta(id);
-    const atualizadas = await dbService.getPerguntas();
-    setPerguntas(atualizadas);
   };
 
   const handleTogglePerguntaAtiva = async (id: string, ativa: boolean) => {
@@ -85,8 +131,6 @@ export default function App() {
     if (!p) return;
     const atualizada = { ...p, ativa };
     await dbService.salvarPergunta(atualizada);
-    const lista = await dbService.getPerguntas();
-    setPerguntas(lista);
   };
 
   // Salas actions
@@ -97,14 +141,10 @@ export default function App() {
       bloco,
     };
     await dbService.salvarSala(nova);
-    const lista = await dbService.getSalas();
-    setSalas(lista);
   };
 
   const handleDeleteSala = async (id: string) => {
     await dbService.excluirSala(id);
-    const lista = await dbService.getSalas();
-    setSalas(lista);
   };
 
   // Turmas actions
@@ -115,14 +155,10 @@ export default function App() {
       turno,
     };
     await dbService.salvarTurma(nova);
-    const lista = await dbService.getTurmas();
-    setTurmas(lista);
   };
 
   const handleDeleteTurma = async (id: string) => {
     await dbService.excluirTurma(id);
-    const lista = await dbService.getTurmas();
-    setTurmas(lista);
   };
 
   // Respostas actions
@@ -137,8 +173,6 @@ export default function App() {
       timestamp: now,
     };
     await dbService.salvarResposta(nova);
-    const lista = await dbService.getRespostas();
-    setRespostas(lista);
   };
 
   const handleChangeSalaTurma = (
@@ -162,10 +196,9 @@ export default function App() {
   };
 
   const handleResetDefaults = async () => {
-    if (confirm('Deseja restaurar as perguntas, salas, turmas e respostas de demonstração padrão?')) {
+    if (confirm('Deseja restaurar as perguntas, salas, turmas e respostas modelo no banco de dados na nuvem?')) {
       setIsLoading(true);
       await dbService.restaurarPadrao();
-      await carregarDadosDoBanco();
       setIsLoading(false);
     }
   };
@@ -176,7 +209,7 @@ export default function App() {
       return;
     }
 
-    let csvContent = '\uFEFF'; // BOM for Excel UTF-8 support
+    let csvContent = '\uFEFF'; // BOM for Excel UTF-8
     csvContent += 'Data/Hora,Professor,Sala,Turma';
     perguntas.forEach((p) => {
       csvContent += `,"${p.enunciado.replace(/"/g, '""')}"`;
@@ -208,34 +241,31 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `backup_questionario_indexeddb_${Date.now()}.json`;
+    link.download = `backup_escolar_firestore_${Date.now()}.json`;
     link.click();
     URL.revokeObjectURL(url);
-  };
-
-  const handleDownloadHtml = () => {
-    const link = document.createElement('a');
-    link.href = '/public/index.html';
-    link.download = 'index.html';
-    link.click();
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
-        <p className="text-sm font-semibold text-slate-700">Inicializando Banco de Dados IndexedDB...</p>
-        <p className="text-xs text-slate-400 mt-1">Carregando perguntas e configurações escolares</p>
+        <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 text-indigo-600 shadow-xs">
+          <Loader2 className="w-8 h-8 animate-spin" />
+        </div>
+        <h2 className="text-base font-bold text-slate-800">Conectando ao Banco de Dados</h2>
+        <p className="text-xs text-slate-500 mt-1 max-w-sm text-center">
+          Sincronizando perguntas, salas, turmas e histórico em tempo real com o Firebase Firestore...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans">
+    <div className="min-h-screen flex flex-col bg-slate-50/70 text-slate-900 font-sans antialiased">
       <Header
         session={session}
         onLogout={handleLogout}
-        onDownloadHtml={handleDownloadHtml}
+        databaseStatus={dbInfo}
       />
 
       <main className="flex-1">
@@ -244,7 +274,6 @@ export default function App() {
             salas={salas}
             turmas={turmas}
             onLogin={handleLogin}
-            onDownloadHtml={handleDownloadHtml}
           />
         ) : session.role === 'diretor' ? (
           <DirectorDashboard
@@ -262,7 +291,6 @@ export default function App() {
             onResetDefaults={handleResetDefaults}
             onExportCsv={handleExportCsv}
             onExportJson={handleExportJson}
-            onDownloadHtml={handleDownloadHtml}
           />
         ) : (
           <TeacherView
@@ -277,20 +305,18 @@ export default function App() {
         )}
       </main>
 
-      <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+      <footer className="bg-white border-t border-slate-200/80 py-5 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div>
-            Colégio Saber Ativo &bull; Sistema de Gestão & Avaliação Escolar
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700">Colégio Saber Ativo</span>
+            <span className="text-slate-300">&bull;</span>
+            <span>Sistema Integrado de Avaliação Institucional</span>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleDownloadHtml}
-              className="text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
-            >
-              Baixar Código HTML Único (.html)
-            </button>
-            <span className="text-slate-300">|</span>
-            <span className="font-mono text-[11px] text-slate-400">IndexedDB v1.0</span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              Firebase Firestore Sincronizado
+            </span>
           </div>
         </div>
       </footer>

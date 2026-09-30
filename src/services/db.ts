@@ -1,7 +1,14 @@
+import {
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  getDocs,
+  onSnapshot,
+} from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, testConnection } from './firebase';
 import { Pergunta, RespostaEnvio, Sala, Turma } from '../types';
-
-const DB_NAME = 'EscolaQuestionarioDB';
-const DB_VERSION = 1;
+import firebaseConfig from '../../firebase-applet-config.json';
 
 export const INITIAL_SALAS: Sala[] = [
   { id: 'sala-101', nome: 'Sala 101 (Bloco A)', bloco: 'Bloco A', capacidade: 35 },
@@ -47,7 +54,12 @@ export const INITIAL_PERGUNTAS: Pergunta[] = [
     enunciado: 'Qual é o estado geral de conservação das carteiras e cadeiras dos alunos?',
     categoria: 'sala',
     tipo: 'multipla_escolha',
-    opcoes: ['Excelente (todas novas e sem avarias)', 'Bom (pequeno desgaste natural)', 'Regular (algumas com folga ou pichadas)', 'Ruim (necessita reparo imediato)'],
+    opcoes: [
+      'Excelente (todas novas e sem avarias)',
+      'Bom (pequeno desgaste natural)',
+      'Regular (algumas com folga ou pichadas)',
+      'Ruim (necessita reparo imediato)',
+    ],
     obrigatoria: true,
     ativa: true,
     ordem: 3,
@@ -65,7 +77,7 @@ export const INITIAL_PERGUNTAS: Pergunta[] = [
   },
   {
     id: 'p-5',
-    enunciado: 'Os alunos trouxeram os materiais pedagógicos (livros, cadernos) e entregaram as atividades/deveres solicitados?',
+    enunciado: 'Os alunos trouxeram os materiais pedagógicos (livros, cadernos) e entregaram as atividades de casa?',
     categoria: 'turma',
     tipo: 'multipla_escolha',
     opcoes: [
@@ -126,49 +138,13 @@ export const INITIAL_PERGUNTAS: Pergunta[] = [
     criadaEm: '2026-09-25T08:10:00.000Z',
   },
   {
-    id: 'p-11',
-    enunciado: 'Como você avalia a colaboração, espírito de equipe e o respeito mútuo demonstrado entre os alunos?',
-    categoria: 'turma',
-    tipo: 'escala',
-    obrigatoria: true,
-    ativa: true,
-    ordem: 10,
-    criadaEm: '2026-09-25T08:15:00.000Z',
-  },
-  {
-    id: 'p-12',
-    enunciado: 'Qual foi o nível de pontualidade e assiduidade dos alunos para o início e permanência na aula?',
-    categoria: 'turma',
-    tipo: 'multipla_escolha',
-    opcoes: [
-      'Turma pontual e presente (acima de 95%)',
-      'Poucos atrasos pontuais e justificados',
-      'Muitos alunos entraram após o sinal ou saíram antes',
-      'Número elevado de ausências/faltas na data',
-    ],
-    obrigatoria: true,
-    ativa: true,
-    ordem: 11,
-    criadaEm: '2026-09-25T08:20:00.000Z',
-  },
-  {
-    id: 'p-13',
-    enunciado: 'Os alunos demonstraram zelo pelo patrimônio escolar (organização das carteiras, lousa e descarte de lixo)?',
-    categoria: 'turma',
-    tipo: 'sim_nao',
-    obrigatoria: true,
-    ativa: true,
-    ordem: 12,
-    criadaEm: '2026-09-25T08:25:00.000Z',
-  },
-  {
     id: 'p-14',
     enunciado: 'Cite nomes de alunos que se destacaram positivamente (liderança, empenho) ou que necessitam de apoio individual:',
     categoria: 'turma',
     tipo: 'texto',
     obrigatoria: false,
     ativa: true,
-    ordem: 13,
+    ordem: 10,
     criadaEm: '2026-09-25T08:30:00.000Z',
   },
   {
@@ -178,7 +154,7 @@ export const INITIAL_PERGUNTAS: Pergunta[] = [
     tipo: 'texto',
     obrigatoria: false,
     ativa: true,
-    ordem: 14,
+    ordem: 11,
     criadaEm: '2026-09-20T10:30:00.000Z',
   },
 ];
@@ -192,12 +168,16 @@ export const INITIAL_RESPOSTAS: RespostaEnvio[] = [
     turmaId: 'turma-6a',
     turmaNome: '6º Ano A',
     respostas: {
-      'p-1': 5,
+      'p-1': 'Ótimo',
       'p-2': 'Sim',
       'p-3': 'Excelente (todas novas e sem avarias)',
-      'p-4': 4,
+      'p-4': 'Ótimo',
       'p-5': 'Maioria dos alunos (70% a 90%)',
       'p-6': 'Não',
+      'p-8': 'Ótimo',
+      'p-9': 'Não, os alunos mantiveram foco exemplar',
+      'p-10': 'Não',
+      'p-14': 'Aluna Beatriz e aluno Lucas com excelente participação e foco nos exercícios de frações.',
       'p-7': 'A turma participou muito bem da atividade com frações. A sala estava limpa e climatizada.',
     },
     criadaEm: '2026-09-24T09:40:00.000Z',
@@ -211,316 +191,482 @@ export const INITIAL_RESPOSTAS: RespostaEnvio[] = [
     turmaId: 'turma-1em',
     turmaNome: '1º Ano Ensino Médio',
     respostas: {
-      'p-1': 4,
+      'p-1': 'Bom',
       'p-2': 'Sim',
       'p-3': 'Bom (pequeno desgaste natural)',
-      'p-4': 5,
+      'p-4': 'Ótimo',
       'p-5': 'Quase a totalidade (acima de 90%)',
       'p-6': 'Não',
+      'p-8': 'Bom',
+      'p-9': 'Poucos casos pontuais e rapidamente solucionados',
+      'p-10': 'Sim',
+      'p-14': 'Aluno Gabriel necessita de apoio individual na leitura e interpretação dos textos históricos.',
       'p-7': 'Ótima discussão sobre a era republicana. Cabo HDMI do projetor apresentou leve oscilação, favor verificar.',
     },
     criadaEm: '2026-09-24T11:15:00.000Z',
     timestamp: 1790255700000,
   },
-  {
-    id: 'resp-3',
-    professorNome: 'Prof. Roberto Silva (Ciências)',
-    salaId: 'sala-lab',
-    salaNome: 'Laboratório de Ciências',
-    turmaId: 'turma-8a',
-    turmaNome: '8º Ano A',
-    respostas: {
-      'p-1': 4,
-      'p-2': 'Sim',
-      'p-3': 'Bom (pequeno desgaste natural)',
-      'p-4': 3,
-      'p-5': 'Maioria dos alunos (70% a 90%)',
-      'p-6': 'Sim',
-      'p-7': 'Dois alunos se distraíram com reagentes no fundo do laboratório. Conversei com ambos após a aula.',
-    },
-    criadaEm: '2026-09-24T14:30:00.000Z',
-    timestamp: 1790267400000,
-  },
 ];
 
-class SchoolDB {
-  private dbPromise: Promise<IDBDatabase> | null = null;
-  private isFallback = false;
+class CloudAndLocalSchoolDB {
+  private isCloudConnected = false;
+  private hasInitialized = false;
 
-  private openDB(): Promise<IDBDatabase> {
-    if (this.dbPromise) return this.dbPromise;
-
-    if (typeof window === 'undefined' || !window.indexedDB) {
-      this.isFallback = true;
-      return Promise.reject(new Error('IndexedDB indisponível'));
-    }
-
-    this.dbPromise = new Promise((resolve, reject) => {
-      const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-
-        // Store Perguntas
-        if (!db.objectStoreNames.contains('perguntas')) {
-          const store = db.createObjectStore('perguntas', { keyPath: 'id' });
-          store.createIndex('categoria', 'categoria', { unique: false });
-          store.createIndex('ordem', 'ordem', { unique: false });
-        }
-
-        // Store Respostas
-        if (!db.objectStoreNames.contains('respostas')) {
-          const store = db.createObjectStore('respostas', { keyPath: 'id' });
-          store.createIndex('salaId', 'salaId', { unique: false });
-          store.createIndex('turmaId', 'turmaId', { unique: false });
-          store.createIndex('timestamp', 'timestamp', { unique: false });
-          store.createIndex('professorNome', 'professorNome', { unique: false });
-        }
-
-        // Store Salas
-        if (!db.objectStoreNames.contains('salas')) {
-          db.createObjectStore('salas', { keyPath: 'id' });
-        }
-
-        // Store Turmas
-        if (!db.objectStoreNames.contains('turmas')) {
-          db.createObjectStore('turmas', { keyPath: 'id' });
-        }
-      };
-
-      request.onsuccess = async () => {
-        const db = request.result;
-        try {
-          await this.seedDefaultsIfEmpty(db);
-        } catch (e) {
-          console.warn('Erro ao inicializar dados padrão:', e);
-        }
-        resolve(db);
-      };
-
-      request.onerror = () => {
-        this.isFallback = true;
-        reject(request.error);
-      };
-    });
-
-    return this.dbPromise;
-  }
-
-  private async seedDefaultsIfEmpty(db: IDBDatabase): Promise<void> {
-    const checkEmpty = (storeName: string): Promise<boolean> => {
-      return new Promise((res) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        const req = store.count();
-        req.onsuccess = () => res(req.result === 0);
-        req.onerror = () => res(false);
-      });
-    };
-
-    const salasEmpty = await checkEmpty('salas');
-    if (salasEmpty) {
-      const tx = db.transaction('salas', 'readwrite');
-      const store = tx.objectStore('salas');
-      INITIAL_SALAS.forEach((s) => store.put(s));
-    }
-
-    const turmasEmpty = await checkEmpty('turmas');
-    if (turmasEmpty) {
-      const tx = db.transaction('turmas', 'readwrite');
-      const store = tx.objectStore('turmas');
-      INITIAL_TURMAS.forEach((t) => store.put(t));
-    }
-
-    const perguntasEmpty = await checkEmpty('perguntas');
-    if (perguntasEmpty) {
-      const tx = db.transaction('perguntas', 'readwrite');
-      const store = tx.objectStore('perguntas');
-      INITIAL_PERGUNTAS.forEach((p) => store.put(p));
-    } else {
-      // Sync any newly added default questions (like the new student questions)
-      const tx = db.transaction('perguntas', 'readwrite');
-      const store = tx.objectStore('perguntas');
-      INITIAL_PERGUNTAS.forEach((p) => {
-        const getReq = store.get(p.id);
-        getReq.onsuccess = () => {
-          if (!getReq.result) {
-            store.put(p);
-          }
-        };
-      });
-    }
-
-    const respostasEmpty = await checkEmpty('respostas');
-    if (respostasEmpty) {
-      const tx = db.transaction('respostas', 'readwrite');
-      const store = tx.objectStore('respostas');
-      INITIAL_RESPOSTAS.forEach((r) => store.put(r));
-    }
-  }
-
-  // Generic helpers
-  private async getAll<T>(storeName: string): Promise<T[]> {
+  async init(): Promise<boolean> {
+    if (this.hasInitialized) return this.isCloudConnected;
     try {
-      const db = await this.openDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result as T[]);
-        req.onerror = () => reject(req.error);
-      });
-    } catch {
-      // Fallback to localStorage
-      const raw = localStorage.getItem(`fallback_${storeName}`);
-      if (raw) return JSON.parse(raw);
-      if (storeName === 'perguntas') return INITIAL_PERGUNTAS as unknown as T[];
-      if (storeName === 'salas') return INITIAL_SALAS as unknown as T[];
-      if (storeName === 'turmas') return INITIAL_TURMAS as unknown as T[];
-      if (storeName === 'respostas') return INITIAL_RESPOSTAS as unknown as T[];
-      return [];
-    }
-  }
-
-  private async putItem<T extends { id: string }>(storeName: string, item: T): Promise<void> {
-    try {
-      const db = await this.openDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const req = store.put(item);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-    } catch {
-      const list = await this.getAll<T>(storeName);
-      const idx = list.findIndex((i) => i.id === item.id);
-      if (idx >= 0) list[idx] = item;
-      else list.push(item);
-      localStorage.setItem(`fallback_${storeName}`, JSON.stringify(list));
-    }
-  }
-
-  private async deleteItem(storeName: string, id: string): Promise<void> {
-    try {
-      const db = await this.openDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const req = store.delete(id);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-      });
-    } catch {
-      const list = await this.getAll<{ id: string }>(storeName);
-      const filtered = list.filter((i) => i.id !== id);
-      localStorage.setItem(`fallback_${storeName}`, JSON.stringify(filtered));
-    }
-  }
-
-  // --- PERGUNTAS ---
-  async getPerguntas(): Promise<Pergunta[]> {
-    const list = await this.getAll<Pergunta>('perguntas');
-    return list.sort((a, b) => a.ordem - b.ordem);
-  }
-
-  async salvarPergunta(pergunta: Pergunta): Promise<void> {
-    await this.putItem('perguntas', pergunta);
-  }
-
-  async excluirPergunta(id: string): Promise<void> {
-    await this.deleteItem('perguntas', id);
-  }
-
-  // --- SALAS ---
-  async getSalas(): Promise<Sala[]> {
-    return this.getAll<Sala>('salas');
-  }
-
-  async salvarSala(sala: Sala): Promise<void> {
-    await this.putItem('salas', sala);
-  }
-
-  async excluirSala(id: string): Promise<void> {
-    await this.deleteItem('salas', id);
-  }
-
-  // --- TURMAS ---
-  async getTurmas(): Promise<Turma[]> {
-    return this.getAll<Turma>('turmas');
-  }
-
-  async salvarTurma(turma: Turma): Promise<void> {
-    await this.putItem('turmas', turma);
-  }
-
-  async excluirTurma(id: string): Promise<void> {
-    await this.deleteItem('turmas', id);
-  }
-
-  // --- RESPOSTAS ---
-  async getRespostas(): Promise<RespostaEnvio[]> {
-    const list = await this.getAll<RespostaEnvio>('respostas');
-    return list.sort((a, b) => b.timestamp - a.timestamp);
-  }
-
-  async salvarResposta(resposta: RespostaEnvio): Promise<void> {
-    await this.putItem('respostas', resposta);
-  }
-
-  async excluirResposta(id: string): Promise<void> {
-    await this.deleteItem('respostas', id);
-  }
-
-  // --- RESTAURAR E EXPORTAR ---
-  async restaurarPadrao(): Promise<void> {
-    try {
-      const db = await this.openDB();
-      const stores = ['perguntas', 'salas', 'turmas', 'respostas'];
-      for (const st of stores) {
-        const tx = db.transaction(st, 'readwrite');
-        tx.objectStore(st).clear();
+      this.isCloudConnected = await testConnection();
+      if (this.isCloudConnected) {
+        await this.seedFirestoreIfEmpty();
+      } else {
+        this.seedLocalStorageIfEmpty();
       }
-      await this.seedDefaultsIfEmpty(db);
+    } catch (err) {
+      console.warn('Fallback to local storage due to init check:', err);
+      this.isCloudConnected = false;
+      this.seedLocalStorageIfEmpty();
+    }
+    this.hasInitialized = true;
+    return this.isCloudConnected;
+  }
+
+  getDatabaseInfo() {
+    return {
+      isCloud: this.isCloudConnected,
+      projectId: firebaseConfig.projectId,
+      firestoreDatabaseId: firebaseConfig.firestoreDatabaseId,
+      statusLabel: this.isCloudConnected ? 'Cloud Firestore Sincronizado' : 'Offline / LocalStorage Ativo',
+    };
+  }
+
+  // Seed Firestore
+  private async seedFirestoreIfEmpty() {
+    try {
+      const salasSnap = await getDocs(collection(db, 'salas'));
+      if (salasSnap.empty) {
+        for (const s of INITIAL_SALAS) {
+          await setDoc(doc(db, 'salas', s.id), s);
+        }
+      }
+
+      const turmasSnap = await getDocs(collection(db, 'turmas'));
+      if (turmasSnap.empty) {
+        for (const t of INITIAL_TURMAS) {
+          await setDoc(doc(db, 'turmas', t.id), t);
+        }
+      }
+
+      const perguntasSnap = await getDocs(collection(db, 'perguntas'));
+      if (perguntasSnap.empty) {
+        for (const p of INITIAL_PERGUNTAS) {
+          await setDoc(doc(db, 'perguntas', p.id), p);
+        }
+      }
+
+      const respostasSnap = await getDocs(collection(db, 'respostas'));
+      if (respostasSnap.empty) {
+        for (const r of INITIAL_RESPOSTAS) {
+          await setDoc(doc(db, 'respostas', r.id), r);
+        }
+      }
+    } catch (e) {
+      console.warn('Notice seeding Firestore:', e);
+    }
+  }
+
+  private seedLocalStorageIfEmpty() {
+    try {
+      if (!localStorage.getItem('escola_salas')) {
+        localStorage.setItem('escola_salas', JSON.stringify(INITIAL_SALAS));
+      }
+      if (!localStorage.getItem('escola_turmas')) {
+        localStorage.setItem('escola_turmas', JSON.stringify(INITIAL_TURMAS));
+      }
+      if (!localStorage.getItem('escola_perguntas')) {
+        localStorage.setItem('escola_perguntas', JSON.stringify(INITIAL_PERGUNTAS));
+      }
+      if (!localStorage.getItem('escola_respostas')) {
+        localStorage.setItem('escola_respostas', JSON.stringify(INITIAL_RESPOSTAS));
+      }
+    } catch (e) {
+      console.warn('Local storage inaccessible:', e);
+    }
+  }
+
+  // --- One-off Async Getters ---
+
+  async getSalas(): Promise<Sala[]> {
+    if (this.isCloudConnected) {
+      try {
+        const snap = await getDocs(collection(db, 'salas'));
+        if (!snap.empty) {
+          const list: Sala[] = [];
+          snap.forEach((d) => list.push(d.data() as Sala));
+          return list;
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.GET, 'salas');
+      }
+    }
+    try {
+      const raw = localStorage.getItem('escola_salas');
+      return raw ? JSON.parse(raw) : INITIAL_SALAS;
     } catch {
-      localStorage.removeItem('fallback_perguntas');
-      localStorage.removeItem('fallback_salas');
-      localStorage.removeItem('fallback_turmas');
-      localStorage.removeItem('fallback_respostas');
+      return INITIAL_SALAS;
+    }
+  }
+
+  async getTurmas(): Promise<Turma[]> {
+    if (this.isCloudConnected) {
+      try {
+        const snap = await getDocs(collection(db, 'turmas'));
+        if (!snap.empty) {
+          const list: Turma[] = [];
+          snap.forEach((d) => list.push(d.data() as Turma));
+          return list;
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.GET, 'turmas');
+      }
+    }
+    try {
+      const raw = localStorage.getItem('escola_turmas');
+      return raw ? JSON.parse(raw) : INITIAL_TURMAS;
+    } catch {
+      return INITIAL_TURMAS;
+    }
+  }
+
+  async getPerguntas(): Promise<Pergunta[]> {
+    if (this.isCloudConnected) {
+      try {
+        const snap = await getDocs(collection(db, 'perguntas'));
+        if (!snap.empty) {
+          const list: Pergunta[] = [];
+          snap.forEach((d) => list.push(d.data() as Pergunta));
+          list.sort((a, b) => a.ordem - b.ordem);
+          return list;
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.GET, 'perguntas');
+      }
+    }
+    try {
+      const raw = localStorage.getItem('escola_perguntas');
+      const list = raw ? JSON.parse(raw) : INITIAL_PERGUNTAS;
+      list.sort((a: Pergunta, b: Pergunta) => a.ordem - b.ordem);
+      return list;
+    } catch {
+      return INITIAL_PERGUNTAS;
+    }
+  }
+
+  async getRespostas(): Promise<RespostaEnvio[]> {
+    if (this.isCloudConnected) {
+      try {
+        const snap = await getDocs(collection(db, 'respostas'));
+        const list: RespostaEnvio[] = [];
+        snap.forEach((d) => list.push(d.data() as RespostaEnvio));
+        list.sort((a, b) => b.timestamp - a.timestamp);
+        return list;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.GET, 'respostas');
+      }
+    }
+    try {
+      const raw = localStorage.getItem('escola_respostas');
+      const list = raw ? JSON.parse(raw) : INITIAL_RESPOSTAS;
+      list.sort((a: RespostaEnvio, b: RespostaEnvio) => b.timestamp - a.timestamp);
+      return list;
+    } catch {
+      return INITIAL_RESPOSTAS;
     }
   }
 
   async exportarTodosDados() {
-    const perguntas = await this.getPerguntas();
-    const salas = await this.getSalas();
-    const turmas = await this.getTurmas();
-    const respostas = await this.getRespostas();
+    const [salas, turmas, perguntas, respostas] = await Promise.all([
+      this.getSalas(),
+      this.getTurmas(),
+      this.getPerguntas(),
+      this.getRespostas(),
+    ]);
     return {
-      sistema: 'EscolaQuestionarioDB',
-      versao: 1,
-      exportadoEm: new Date().toISOString(),
-      dados: { perguntas, salas, turmas, respostas },
+      backupDate: new Date().toISOString(),
+      databaseMode: this.isCloudConnected ? 'Cloud Firestore' : 'LocalStorage',
+      salas,
+      turmas,
+      perguntas,
+      respostas,
     };
   }
 
-  async importarDados(dadosBackup: any): Promise<boolean> {
-    if (!dadosBackup?.dados) return false;
-    const { perguntas, salas, turmas, respostas } = dadosBackup.dados;
+  // --- Real-time Listeners with error handlers ---
 
-    if (Array.isArray(perguntas)) {
-      for (const p of perguntas) await this.salvarPergunta(p);
+  subscribeSalas(callback: (salas: Sala[]) => void): () => void {
+    if (this.isCloudConnected) {
+      const path = 'salas';
+      const unsubscribe = onSnapshot(
+        collection(db, path),
+        (snapshot) => {
+          const list: Sala[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as Sala);
+          });
+          callback(list.length > 0 ? list : INITIAL_SALAS);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
+      );
+      return unsubscribe;
+    } else {
+      // Local fallback
+      try {
+        const raw = localStorage.getItem('escola_salas');
+        callback(raw ? JSON.parse(raw) : INITIAL_SALAS);
+      } catch {
+        callback(INITIAL_SALAS);
+      }
+      return () => {};
     }
-    if (Array.isArray(salas)) {
-      for (const s of salas) await this.salvarSala(s);
+  }
+
+  subscribeTurmas(callback: (turmas: Turma[]) => void): () => void {
+    if (this.isCloudConnected) {
+      const path = 'turmas';
+      const unsubscribe = onSnapshot(
+        collection(db, path),
+        (snapshot) => {
+          const list: Turma[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as Turma);
+          });
+          callback(list.length > 0 ? list : INITIAL_TURMAS);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
+      );
+      return unsubscribe;
+    } else {
+      try {
+        const raw = localStorage.getItem('escola_turmas');
+        callback(raw ? JSON.parse(raw) : INITIAL_TURMAS);
+      } catch {
+        callback(INITIAL_TURMAS);
+      }
+      return () => {};
     }
-    if (Array.isArray(turmas)) {
-      for (const t of turmas) await this.salvarTurma(t);
+  }
+
+  subscribePerguntas(callback: (perguntas: Pergunta[]) => void): () => void {
+    if (this.isCloudConnected) {
+      const path = 'perguntas';
+      const unsubscribe = onSnapshot(
+        collection(db, path),
+        (snapshot) => {
+          const list: Pergunta[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as Pergunta);
+          });
+          list.sort((a, b) => a.ordem - b.ordem);
+          callback(list.length > 0 ? list : INITIAL_PERGUNTAS);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
+      );
+      return unsubscribe;
+    } else {
+      try {
+        const raw = localStorage.getItem('escola_perguntas');
+        const list = raw ? JSON.parse(raw) : INITIAL_PERGUNTAS;
+        list.sort((a: Pergunta, b: Pergunta) => a.ordem - b.ordem);
+        callback(list);
+      } catch {
+        callback(INITIAL_PERGUNTAS);
+      }
+      return () => {};
     }
-    if (Array.isArray(respostas)) {
-      for (const r of respostas) await this.salvarResposta(r);
+  }
+
+  subscribeRespostas(callback: (respostas: RespostaEnvio[]) => void): () => void {
+    if (this.isCloudConnected) {
+      const path = 'respostas';
+      const unsubscribe = onSnapshot(
+        collection(db, path),
+        (snapshot) => {
+          const list: RespostaEnvio[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as RespostaEnvio);
+          });
+          list.sort((a, b) => b.timestamp - a.timestamp);
+          callback(list);
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, path);
+        }
+      );
+      return unsubscribe;
+    } else {
+      try {
+        const raw = localStorage.getItem('escola_respostas');
+        const list = raw ? JSON.parse(raw) : INITIAL_RESPOSTAS;
+        list.sort((a: RespostaEnvio, b: RespostaEnvio) => b.timestamp - a.timestamp);
+        callback(list);
+      } catch {
+        callback(INITIAL_RESPOSTAS);
+      }
+      return () => {};
     }
-    return true;
+  }
+
+  // --- CRUD Operations ---
+
+  async salvarPergunta(pergunta: Pergunta): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `perguntas/${pergunta.id}`;
+      try {
+        await setDoc(doc(db, 'perguntas', pergunta.id), pergunta);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+      }
+    }
+    // Also sync to local
+    this.updateLocalList('escola_perguntas', pergunta);
+  }
+
+  async excluirPergunta(id: string): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `perguntas/${id}`;
+      try {
+        await deleteDoc(doc(db, 'perguntas', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, path);
+      }
+    }
+    this.removeFromLocalList('escola_perguntas', id);
+  }
+
+  async salvarSala(sala: Sala): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `salas/${sala.id}`;
+      try {
+        await setDoc(doc(db, 'salas', sala.id), sala);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+      }
+    }
+    this.updateLocalList('escola_salas', sala);
+  }
+
+  async excluirSala(id: string): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `salas/${id}`;
+      try {
+        await deleteDoc(doc(db, 'salas', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, path);
+      }
+    }
+    this.removeFromLocalList('escola_salas', id);
+  }
+
+  async salvarTurma(turma: Turma): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `turmas/${turma.id}`;
+      try {
+        await setDoc(doc(db, 'turmas', turma.id), turma);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+      }
+    }
+    this.updateLocalList('escola_turmas', turma);
+  }
+
+  async excluirTurma(id: string): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `turmas/${id}`;
+      try {
+        await deleteDoc(doc(db, 'turmas', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, path);
+      }
+    }
+    this.removeFromLocalList('escola_turmas', id);
+  }
+
+  async salvarResposta(resposta: RespostaEnvio): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `respostas/${resposta.id}`;
+      try {
+        await setDoc(doc(db, 'respostas', resposta.id), resposta);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, path);
+      }
+    }
+    this.updateLocalList('escola_respostas', resposta);
+  }
+
+  async excluirResposta(id: string): Promise<void> {
+    if (this.isCloudConnected) {
+      const path = `respostas/${id}`;
+      try {
+        await deleteDoc(doc(db, 'respostas', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, path);
+      }
+    }
+    this.removeFromLocalList('escola_respostas', id);
+  }
+
+  // --- Reset to Default Seed ---
+  async restaurarPadrao(): Promise<void> {
+    if (this.isCloudConnected) {
+      try {
+        for (const p of INITIAL_PERGUNTAS) {
+          await setDoc(doc(db, 'perguntas', p.id), p);
+        }
+        for (const s of INITIAL_SALAS) {
+          await setDoc(doc(db, 'salas', s.id), s);
+        }
+        for (const t of INITIAL_TURMAS) {
+          await setDoc(doc(db, 'turmas', t.id), t);
+        }
+        for (const r of INITIAL_RESPOSTAS) {
+          await setDoc(doc(db, 'respostas', r.id), r);
+        }
+      } catch (error) {
+        console.warn('Error resetting defaults in cloud:', error);
+      }
+    }
+
+    localStorage.setItem('escola_salas', JSON.stringify(INITIAL_SALAS));
+    localStorage.setItem('escola_turmas', JSON.stringify(INITIAL_TURMAS));
+    localStorage.setItem('escola_perguntas', JSON.stringify(INITIAL_PERGUNTAS));
+    localStorage.setItem('escola_respostas', JSON.stringify(INITIAL_RESPOSTAS));
+  }
+
+  // Helper local storage utils
+  private updateLocalList<T extends { id: string }>(key: string, item: T) {
+    try {
+      const raw = localStorage.getItem(key);
+      const list: T[] = raw ? JSON.parse(raw) : [];
+      const idx = list.findIndex((x) => x.id === item.id);
+      if (idx >= 0) list[idx] = item;
+      else list.push(item);
+      localStorage.setItem(key, JSON.stringify(list));
+    } catch {}
+  }
+
+  private removeFromLocalList(key: string, id: string) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const list = JSON.parse(raw).filter((x: { id: string }) => x.id !== id);
+      localStorage.setItem(key, JSON.stringify(list));
+    } catch {}
   }
 }
 
-export const dbService = new SchoolDB();
+export const dbService = new CloudAndLocalSchoolDB();

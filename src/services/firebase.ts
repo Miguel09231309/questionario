@@ -61,15 +61,23 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Test Connection Helper mandated by Firebase Skill
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timeout')), 3500)
+    );
+    await Promise.race([
+      getDocFromServer(doc(db, 'test', 'connection')),
+      timeoutPromise,
+    ]);
     return true;
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline. Checking fallback.');
-      return false;
+      console.error('Please check your Firebase configuration.');
+    } else {
+      console.warn('Firestore offline/unreachable on test ping:', error);
     }
-    // Any permission or network error
-    console.info('Firestore ping received:', error);
-    return true;
+    return false;
   }
 }
+
+// Call testConnection at boot as instructed in SKILL.md
+testConnection();

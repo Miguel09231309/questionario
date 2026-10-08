@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pergunta, RespostaEnvio, UserSession, Sala, Turma } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Pergunta, RespostaEnvio, UserSession, Sala, Turma, QuestionCategory } from '../types';
 import {
   CheckCircle2,
   Building,
@@ -22,7 +22,29 @@ import {
   Check,
   ChevronRight,
   Filter,
+  Save,
+  Sparkles,
+  Clock,
+  RotateCcw,
+  Activity,
+  Layers,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend as RechartsLegend,
+  Cell,
+} from 'recharts';
 
 interface TeacherViewProps {
   session: UserSession;
@@ -48,7 +70,14 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
   onChangeSalaTurma,
 }) => {
   const [activeTab, setActiveTab] = useState<TeacherTab>('responder');
+  const [tipoGrafico, setTipoGrafico] = useState<'radar' | 'barras'>('radar');
   const [respostasState, setRespostasState] = useState<Record<string, string | number>>({});
+  const [observacoesAdicionais, setObservacoesAdicionais] = useState<string>('');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState<boolean>(false);
+  const isInitialMount = useRef<boolean>(true);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessCard, setShowSuccessCard] = useState(false);
   const [showChangeModal, setShowChangeModal] = useState(false);
@@ -68,6 +97,98 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
   // Active questions
   const activePerguntas = perguntas.filter((p) => p.ativa);
 
+  // Storage keys tied to the current teacher and current turma
+  const draftKey = `escola_draft_obs_${session.nome}_${session.turmaId || 'geral'}`;
+  const draftRespostasKey = `escola_draft_respostas_${session.nome}_${session.turmaId || 'geral'}`;
+
+  // Restore draft locally if session was interrupted
+  useEffect(() => {
+    isInitialMount.current = true;
+    try {
+      const savedObs = localStorage.getItem(draftKey);
+      const savedRespostas = localStorage.getItem(draftRespostasKey);
+      let found = false;
+
+      if (savedObs) {
+        setObservacoesAdicionais(savedObs);
+        found = true;
+      }
+
+      if (savedRespostas) {
+        const parsed = JSON.parse(savedRespostas);
+        if (parsed && typeof parsed === 'object') {
+          setRespostasState(parsed);
+          found = true;
+        }
+      }
+
+      if (found) {
+        setHasRestoredDraft(true);
+        setAutoSaveStatus('saved');
+        const now = new Date();
+        setLastSavedTime(
+          now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        );
+      } else {
+        setHasRestoredDraft(false);
+        setAutoSaveStatus('idle');
+      }
+    } catch (e) {
+      console.warn('Erro ao restaurar rascunho de observações:', e);
+    }
+  }, [draftKey, draftRespostasKey]);
+
+  // Debounced auto-save effect (600ms) for 'Observações adicionais' and questionnaire progress
+  useEffect(() => {
+    // Avoid saving on initial mount before user starts typing
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    setAutoSaveStatus('saving');
+
+    const debounceTimer = setTimeout(() => {
+      try {
+        if (observacoesAdicionais.trim()) {
+          localStorage.setItem(draftKey, observacoesAdicionais);
+        } else {
+          localStorage.removeItem(draftKey);
+        }
+
+        if (Object.keys(respostasState).length > 0) {
+          localStorage.setItem(draftRespostasKey, JSON.stringify(respostasState));
+        }
+
+        const now = new Date();
+        const formatted = now.toLocaleTimeString('pt-BR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+        setLastSavedTime(formatted);
+        setAutoSaveStatus('saved');
+      } catch (err) {
+        console.error('Erro ao auto-salvar no localStorage:', err);
+        setAutoSaveStatus('idle');
+      }
+    }, 600); // 600ms debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [observacoesAdicionais, respostasState, draftKey, draftRespostasKey]);
+
+  const handleClearDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+      localStorage.removeItem(draftRespostasKey);
+    } catch {}
+    setObservacoesAdicionais('');
+    setRespostasState({});
+    setHasRestoredDraft(false);
+    setAutoSaveStatus('idle');
+    setLastSavedTime(null);
+  };
+
   // Calculate completion progress
   const totalPerguntas = activePerguntas.length;
   const respondidasCount = activePerguntas.filter((p) => {
@@ -82,6 +203,9 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
       [perguntaId]: valor,
     }));
   };
+
+  const isObsQuestion = (p: Pergunta) =>
+    p.id === 'p-7' || p.enunciado.toLowerCase().includes('observações adicionais');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,14 +223,33 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
 
     setIsSubmitting(true);
     try {
+      // Sync observacoesAdicionais to question if active
+      const finalRespostas = { ...respostasState };
+      const obsQ = activePerguntas.find((p) => isObsQuestion(p));
+      if (obsQ && observacoesAdicionais) {
+        finalRespostas[obsQ.id] = observacoesAdicionais;
+      }
+
       await onSalvarResposta({
         professorNome: session.nome,
         salaId: session.salaId || 'sala-geral',
-        salaNome: session.salaNome || 'Sala Principal',
+        salaNome: session.salaNome || 'Geral',
         turmaId: session.turmaId || 'turma-geral',
         turmaNome: session.turmaNome || 'Turma Principal',
-        respostas: respostasState,
+        respostas: finalRespostas,
+        observacoesGerais: observacoesAdicionais.trim() || undefined,
       });
+
+      // Clear local storage draft upon successful completion
+      try {
+        localStorage.removeItem(draftKey);
+        localStorage.removeItem(draftRespostasKey);
+      } catch {}
+      setObservacoesAdicionais('');
+      setRespostasState({});
+      setHasRestoredDraft(false);
+      setAutoSaveStatus('idle');
+      setLastSavedTime(null);
 
       setShowSuccessCard(true);
       // Auto-set the current turma for the performance view
@@ -263,6 +406,124 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
     };
   };
 
+  // Helper to calculate category averages for Recharts radar/bar chart
+  const calcularMediasCategorias = (turmaId: string) => {
+    const respostasDaTurma = respostas.filter((r) => r.turmaId === turmaId);
+
+    const categoriasBase: Record<
+      QuestionCategory,
+      { nome: string; descricao: string; cor: string; notas: number[] }
+    > = {
+      turma: {
+        nome: 'Comportamento da Turma',
+        descricao: 'Foco, pontualidade, disciplina e participação em sala',
+        cor: '#10b981', // emerald-500
+        notas: [],
+      },
+      sala: {
+        nome: 'Estrutura & Recursos',
+        descricao: 'Equipamentos, materiais didáticos e ambiente físico',
+        cor: '#0ea5e9', // sky-500
+        notas: [],
+      },
+      geral: {
+        nome: 'Geral & Pedagógico',
+        descricao: 'Clima escolar, desenvolvimento das aulas e melhorias',
+        cor: '#6366f1', // indigo-500
+        notas: [],
+      },
+    };
+
+    respostasDaTurma.forEach((resp) => {
+      Object.entries(resp.respostas).forEach(([pid, val]) => {
+        const pergunta = perguntas.find((p) => p.id === pid);
+        if (!pergunta) return;
+        const cat = pergunta.categoria;
+        if (!categoriasBase[cat]) return;
+
+        let notaNum: number | null = null;
+        if (typeof val === 'number') {
+          notaNum = val;
+        } else if (typeof val === 'string') {
+          if (val === 'Ótimo') notaNum = 5;
+          else if (val === 'Bom') notaNum = 4;
+          else if (val === 'Regular') notaNum = 3;
+          else if (val === 'Ruim') notaNum = 1;
+          else if (val === 'Sim') {
+            const isNegative =
+              pergunta.enunciado.toLowerCase().includes('ocorrência') ||
+              pergunta.enunciado.toLowerCase().includes('grave') ||
+              pergunta.enunciado.toLowerCase().includes('dispersão');
+            notaNum = isNegative ? 1.5 : 5;
+          } else if (val === 'Não') {
+            const isNegative =
+              pergunta.enunciado.toLowerCase().includes('ocorrência') ||
+              pergunta.enunciado.toLowerCase().includes('grave') ||
+              pergunta.enunciado.toLowerCase().includes('dispersão');
+            notaNum = isNegative ? 5 : 2;
+          } else if (pergunta.opcoes && pergunta.opcoes.length > 0) {
+            const idx = pergunta.opcoes.indexOf(val);
+            if (idx !== -1) {
+              const totalOpcoes = pergunta.opcoes.length;
+              notaNum = Number((5 - idx * (3 / Math.max(1, totalOpcoes - 1))).toFixed(1));
+            }
+          }
+        }
+
+        if (notaNum !== null && !isNaN(notaNum)) {
+          categoriasBase[cat].notas.push(notaNum);
+        }
+      });
+    });
+
+    return Object.entries(categoriasBase).map(([catKey, data]) => {
+      const media =
+        data.notas.length > 0
+          ? Number((data.notas.reduce((a, b) => a + b, 0) / data.notas.length).toFixed(1))
+          : 0;
+
+      return {
+        key: catKey,
+        categoria: data.nome,
+        descricao: data.descricao,
+        media,
+        totalRespostas: data.notas.length,
+        cor: data.cor,
+        meta: 5.0,
+      };
+    });
+  };
+
+  const CustomChartTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-slate-900/95 backdrop-blur-xs text-white p-3 rounded-xl shadow-xl text-xs border border-slate-700/80 space-y-1.5 max-w-xs z-50">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-extrabold text-xs text-emerald-400">{data.categoria}</span>
+            <span
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: data.cor }}
+            />
+          </div>
+          <p className="text-slate-300 text-[10px] leading-relaxed">{data.descricao}</p>
+          <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between gap-4">
+            <span className="text-slate-400 text-[11px]">Média da Categoria:</span>
+            <span className="font-extrabold text-white font-mono text-xs flex items-center gap-1">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              {data.media} / 5.0
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-slate-400">
+            <span>Respostas computadas:</span>
+            <span className="font-mono">{data.totalRespostas} registros</span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const turmaAtivaObj = turmas.find((t) => t.id === selectedTurmaDesempenho) || turmas[0];
   const metricasTurmaAtiva = turmaAtivaObj ? calcularMetricasTurma(turmaAtivaObj.id) : null;
 
@@ -280,13 +541,9 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
               {session.nome}
             </h1>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs sm:text-sm text-emerald-100 font-medium">
-              <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-md">
-                <Building className="w-3.5 h-3.5 text-emerald-200" />
-                Sala Atual: <strong className="text-white">{session.salaNome}</strong>
-              </span>
-              <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-md">
-                <Users className="w-3.5 h-3.5 text-emerald-200" />
-                Turma Atual: <strong className="text-white">{session.turmaNome}</strong>
+              <span className="flex items-center gap-1.5 bg-black/20 px-3 py-1.5 rounded-lg border border-white/10">
+                <Users className="w-4 h-4 text-emerald-300" />
+                Turma Selecionada: <strong className="text-white ml-1">{session.turmaNome}</strong>
               </span>
             </div>
           </div>
@@ -294,9 +551,10 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowChangeModal(true)}
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 border border-white/25 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer shrink-0"
+              className="px-4 py-2 bg-white/15 hover:bg-white/25 border border-white/25 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
             >
-              Trocar Sala / Turma
+              <Users className="w-3.5 h-3.5" />
+              <span>Mudar de Turma</span>
             </button>
           </div>
         </div>
@@ -358,9 +616,7 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
                 Respostas Gravadas com Sucesso!
               </h2>
               <p className="text-sm text-slate-600 max-w-lg mx-auto mt-2 leading-relaxed">
-                Suas avaliações sobre a turma <strong>{session.turmaNome}</strong> e a sala{' '}
-                <strong>{session.salaNome}</strong> foram salvas no banco de dados IndexedDB e
-                já atualizaram os relatórios da escola.
+                Suas avaliações sobre a turma <strong>{session.turmaNome}</strong> foram salvas com sucesso no banco de dados na nuvem e já atualizaram os indicadores pedagógicos da escola.
               </p>
 
               {/* Direct Next Step Action Boxes */}
@@ -443,6 +699,32 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Draft Recovered Banner */}
+              {hasRestoredDraft && (
+                <div className="mb-5 p-3.5 bg-indigo-50 border border-indigo-200/90 text-indigo-950 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs animate-fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold block text-indigo-900">Rascunho recuperado com sucesso</span>
+                      <span className="text-slate-600 text-[11px]">
+                        Suas observações adicionais e respostas anteriores foram restauradas localmente da sessão anterior.
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleClearDraft}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-md transition-colors cursor-pointer"
+                    >
+                      Descartar Rascunho
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-5">
@@ -630,12 +912,57 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
                             {p.tipo === 'texto' && (
                               <div>
                                 <textarea
-                                  rows={3}
-                                  value={(valorAtual as string) || ''}
-                                  onChange={(e) => handleSetValor(p.id, e.target.value)}
-                                  placeholder="Escreva aqui suas observações pedagógicas, pontos de atenção ou alunos que se destacaram..."
-                                  className="w-full text-xs px-3 py-2 bg-slate-50/50 border border-slate-300 rounded-lg focus:outline-hidden focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                                  rows={isObsQuestion(p) ? 4 : 3}
+                                  value={
+                                    isObsQuestion(p)
+                                      ? (observacoesAdicionais || (valorAtual as string) || '')
+                                      : ((valorAtual as string) || '')
+                                  }
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handleSetValor(p.id, val);
+                                    if (isObsQuestion(p)) {
+                                      setObservacoesAdicionais(val);
+                                    }
+                                  }}
+                                  placeholder={
+                                    isObsQuestion(p)
+                                      ? "Escreva aqui suas observações adicionais... O texto é salvo automaticamente no seu navegador com debounce."
+                                      : "Escreva aqui suas observações pedagógicas, pontos de atenção ou alunos que se destacaram..."
+                                  }
+                                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-slate-50/50 border border-slate-300 rounded-lg focus:outline-hidden focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 leading-relaxed transition-all"
                                 />
+
+                                {isObsQuestion(p) && (
+                                  <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100 text-xs">
+                                    <div className="flex items-center gap-1.5">
+                                      {autoSaveStatus === 'saving' && (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full animate-pulse">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                                          Salvando rascunho automaticamente...
+                                        </span>
+                                      )}
+                                      {autoSaveStatus === 'saved' && (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                          Salvo localmente {lastSavedTime ? `às ${lastSavedTime}` : ''}
+                                        </span>
+                                      )}
+                                      {autoSaveStatus === 'idle' && (
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                                          <Save className="w-3.5 h-3.5 text-slate-400" />
+                                          Salvamento automático debounced ativo
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                                      <span>Progresso seguro contra interrupções</span>
+                                      <span className="font-mono">
+                                        {(observacoesAdicionais || (valorAtual as string) || '').length} caracteres
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -643,6 +970,62 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
                       </React.Fragment>
                     );
                   })
+                )}
+
+                {/* Fallback dedicated block for Observações adicionais if no matching question is active */}
+                {activePerguntas.length > 0 && !activePerguntas.some((p) => isObsQuestion(p)) && (
+                  <div className="p-5 rounded-xl border border-indigo-200/90 bg-gradient-to-b from-indigo-50/40 via-white to-white shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                          <MessageSquare className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <label htmlFor="obs-adicionais-textarea" className="text-sm font-bold text-slate-900 block">
+                            Observações adicionais
+                          </label>
+                          <p className="text-[11px] text-slate-500">
+                            Anotações pedagógicas, pontos de atenção ou solicitações gerais da turma.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                        {autoSaveStatus === 'saving' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                            Salvando rascunho...
+                          </span>
+                        )}
+                        {autoSaveStatus === 'saved' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Salvo localmente {lastSavedTime ? `às ${lastSavedTime}` : ''}
+                          </span>
+                        )}
+                        {autoSaveStatus === 'idle' && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                            <Save className="w-3.5 h-3.5 text-slate-400" />
+                            Salvamento automático ativo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <textarea
+                      id="obs-adicionais-textarea"
+                      rows={4}
+                      value={observacoesAdicionais}
+                      onChange={(e) => setObservacoesAdicionais(e.target.value)}
+                      placeholder="Escreva aqui suas observações adicionais sobre esta turma... O texto é salvo automaticamente no seu navegador com debounce."
+                      className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 shadow-2xs leading-relaxed"
+                    />
+
+                    <div className="flex items-center justify-between mt-2 text-[11px] text-slate-400">
+                      <span>Progresso seguro contra fechamento acidental da página ou queda de rede.</span>
+                      <span className="font-mono">{observacoesAdicionais.length} caracteres</span>
+                    </div>
+                  </div>
                 )}
 
                 {activePerguntas.length > 0 && (
@@ -769,6 +1152,210 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
                   </p>
                 </div>
               </div>
+
+              {/* ============================================================== */}
+              {/* RECHARTS: GRÁFICO DE RADAR OU BARRAS POR CATEGORIA DE PERGUNTA */}
+              {/* ============================================================== */}
+              {turmaAtivaObj && (
+                <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-emerald-600" />
+                        <h4 className="text-base font-bold text-slate-900">
+                          Média por Categoria de Pergunta ({turmaAtivaObj.nome})
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Visualização gráfica do desempenho médio da turma dividido por categorias de avaliação.
+                      </p>
+                    </div>
+
+                    {/* Chart Type Toggle: Radar vs Barras */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl self-start sm:self-auto border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setTipoGrafico('radar')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          tipoGrafico === 'radar'
+                            ? 'bg-white text-emerald-700 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>Radar (360°)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTipoGrafico('barras')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          tipoGrafico === 'barras'
+                            ? 'bg-white text-emerald-700 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        <span>Barras</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const dadosCategorias = calcularMediasCategorias(turmaAtivaObj.id);
+                    const temDados = dadosCategorias.some((c) => c.totalRespostas > 0);
+
+                    if (!temDados) {
+                      return (
+                        <div className="py-12 text-center text-slate-500">
+                          <Activity className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                          <p className="text-sm font-semibold text-slate-700">
+                            Aguardando primeiras avaliações para gerar o gráfico
+                          </p>
+                          <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                            Assim que os professores responderem às perguntas sobre a turma <strong>{turmaAtivaObj.nome}</strong>,
+                            o gráfico de radar e de barras exibirá as médias consolidadas por categoria.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                        {/* Chart Area */}
+                        <div className="lg:col-span-7 bg-slate-50/60 rounded-xl p-3 sm:p-4 border border-slate-100 flex flex-col items-center justify-center min-h-[340px]">
+                          <div className="w-full h-80 sm:h-88">
+                            <ResponsiveContainer width="100%" height="100%">
+                              {tipoGrafico === 'radar' ? (
+                                <RadarChart cx="50%" cy="50%" outerRadius="72%" data={dadosCategorias}>
+                                  <PolarGrid stroke="#cbd5e1" strokeDasharray="3 3" />
+                                  <PolarAngleAxis
+                                    dataKey="categoria"
+                                    tick={{ fill: '#334155', fontSize: 11, fontWeight: 700 }}
+                                  />
+                                  <PolarRadiusAxis
+                                    angle={30}
+                                    domain={[0, 5]}
+                                    ticks={[1, 2, 3, 4, 5]}
+                                    tick={{ fill: '#64748b', fontSize: 10 }}
+                                  />
+                                  <Radar
+                                    name="Média da Categoria (1 a 5)"
+                                    dataKey="media"
+                                    stroke="#059669"
+                                    fill="#10b981"
+                                    fillOpacity={0.4}
+                                  />
+                                  <RechartsTooltip content={<CustomChartTooltip />} />
+                                  <RechartsLegend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+                                </RadarChart>
+                              ) : (
+                                <BarChart
+                                  data={dadosCategorias}
+                                  margin={{ top: 20, right: 20, left: -10, bottom: 20 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                  <XAxis
+                                    dataKey="categoria"
+                                    tick={{ fill: '#334155', fontSize: 11, fontWeight: 700 }}
+                                    interval={0}
+                                  />
+                                  <YAxis
+                                    domain={[0, 5]}
+                                    ticks={[0, 1, 2, 3, 4, 5]}
+                                    tick={{ fill: '#64748b', fontSize: 11 }}
+                                  />
+                                  <RechartsTooltip content={<CustomChartTooltip />} />
+                                  <Bar
+                                    dataKey="media"
+                                    name="Média da Categoria (1 a 5)"
+                                    radius={[8, 8, 0, 0]}
+                                    maxBarSize={55}
+                                  >
+                                    {dadosCategorias.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.cor} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              )}
+                            </ResponsiveContainer>
+                          </div>
+                          <span className="text-[11px] text-slate-400 mt-1">
+                            Escala de avaliação normalizada de 1.0 (crítico) a 5.0 (excelente)
+                          </span>
+                        </div>
+
+                        {/* Breakdown Cards by Category */}
+                        <div className="lg:col-span-5 space-y-3">
+                          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            Detalhamento por Categoria:
+                          </h5>
+                          {dadosCategorias.map((item) => {
+                            const percentual = Math.min(100, Math.round((item.media / 5) * 100));
+                            let badgeCor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                            let statusTexto = 'Excelente';
+                            if (item.media < 2.5) {
+                              badgeCor = 'text-rose-700 bg-rose-50 border-rose-200';
+                              statusTexto = 'Atenção Crítica';
+                            } else if (item.media < 3.5) {
+                              badgeCor = 'text-amber-700 bg-amber-50 border-amber-200';
+                              statusTexto = 'Regular';
+                            } else if (item.media < 4.4) {
+                              badgeCor = 'text-sky-700 bg-sky-50 border-sky-200';
+                              statusTexto = 'Bom';
+                            }
+
+                            return (
+                              <div
+                                key={item.key}
+                                className="p-3.5 rounded-xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-2xs"
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full"
+                                      style={{ backgroundColor: item.cor }}
+                                    />
+                                    <span className="font-bold text-xs text-slate-900">
+                                      {item.categoria}
+                                    </span>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeCor}`}>
+                                    {statusTexto}
+                                  </span>
+                                </div>
+
+                                <p className="text-[11px] text-slate-500 mb-2 line-clamp-1">
+                                  {item.descricao}
+                                </p>
+
+                                <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                                  <span className="text-slate-600 text-[11px]">
+                                    {item.totalRespostas} {item.totalRespostas === 1 ? 'registro' : 'registros'}
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-900 flex items-center gap-1">
+                                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                    {item.media.toFixed(1)} / 5.0
+                                  </span>
+                                </div>
+
+                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${percentual}%`,
+                                      backgroundColor: item.cor,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* Highlight Quotes & Teacher Observations */}
               <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs">
@@ -991,47 +1578,30 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
         </div>
       )}
 
-      {/* Modal to Switch Classroom or Class */}
+      {/* Modal to Switch Class */}
       {showChangeModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-900 mb-1">
-              Alterar Sala de Aula ou Turma
+              Mudar Turma de Avaliação
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Selecione os dados da nova aula que você está avaliando agora.
+              Selecione a turma que você deseja avaliar agora.
             </p>
 
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Sala de Aula
-                </label>
-                <select
-                  value={selectedSalaId}
-                  onChange={(e) => setSelectedSalaId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600"
-                >
-                  {salas.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Turma / Série
+                  Selecione a Turma / Série
                 </label>
                 <select
                   value={selectedTurmaId}
                   onChange={(e) => setSelectedTurmaId(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600"
+                  className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600 font-medium"
                 >
                   {turmas.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.nome} ({t.turno})
+                      {t.nome} — Turno {t.turno}
                     </option>
                   ))}
                 </select>
@@ -1051,7 +1621,7 @@ export const TeacherView: React.FC<TeacherViewProps> = ({
                 onClick={handleConfirmChangeSalaTurma}
                 className="px-4 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer shadow-xs"
               >
-                Confirmar Alteração
+                Confirmar Turma
               </button>
             </div>
           </div>

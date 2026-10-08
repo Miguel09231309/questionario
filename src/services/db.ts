@@ -214,17 +214,20 @@ class CloudAndLocalSchoolDB {
 
   async init(): Promise<boolean> {
     if (this.hasInitialized) return this.isCloudConnected;
+    // Always seed local storage first so data is guaranteed to be available instantly
+    this.seedLocalStorageIfEmpty();
+
     try {
       this.isCloudConnected = await testConnection();
       if (this.isCloudConnected) {
-        await this.seedFirestoreIfEmpty();
-      } else {
-        this.seedLocalStorageIfEmpty();
+        // Run cloud seed asynchronously without blocking
+        this.seedFirestoreIfEmpty().catch((err) => {
+          console.warn('Notice seeding Firestore in background:', err);
+        });
       }
     } catch (err) {
-      console.warn('Fallback to local storage due to init check:', err);
+      console.warn('Operating in local storage mode:', err);
       this.isCloudConnected = false;
-      this.seedLocalStorageIfEmpty();
     }
     this.hasInitialized = true;
     return this.isCloudConnected;
@@ -293,7 +296,7 @@ class CloudAndLocalSchoolDB {
     }
   }
 
-  // --- One-off Async Getters ---
+  // --- One-off Async Getters with Local Fallback ---
 
   async getSalas(): Promise<Sala[]> {
     if (this.isCloudConnected) {
@@ -305,7 +308,11 @@ class CloudAndLocalSchoolDB {
           return list;
         }
       } catch (err) {
-        handleFirestoreError(err, OperationType.GET, 'salas');
+        try {
+          handleFirestoreError(err, OperationType.GET, 'salas');
+        } catch (e) {
+          console.warn('Firestore getSalas notice:', e);
+        }
       }
     }
     try {
@@ -326,7 +333,11 @@ class CloudAndLocalSchoolDB {
           return list;
         }
       } catch (err) {
-        handleFirestoreError(err, OperationType.GET, 'turmas');
+        try {
+          handleFirestoreError(err, OperationType.GET, 'turmas');
+        } catch (e) {
+          console.warn('Firestore getTurmas notice:', e);
+        }
       }
     }
     try {
@@ -348,7 +359,11 @@ class CloudAndLocalSchoolDB {
           return list;
         }
       } catch (err) {
-        handleFirestoreError(err, OperationType.GET, 'perguntas');
+        try {
+          handleFirestoreError(err, OperationType.GET, 'perguntas');
+        } catch (e) {
+          console.warn('Firestore getPerguntas notice:', e);
+        }
       }
     }
     try {
@@ -370,7 +385,11 @@ class CloudAndLocalSchoolDB {
         list.sort((a, b) => b.timestamp - a.timestamp);
         return list;
       } catch (err) {
-        handleFirestoreError(err, OperationType.GET, 'respostas');
+        try {
+          handleFirestoreError(err, OperationType.GET, 'respostas');
+        } catch (e) {
+          console.warn('Firestore getRespostas notice:', e);
+        }
       }
     }
     try {
@@ -400,7 +419,7 @@ class CloudAndLocalSchoolDB {
     };
   }
 
-  // --- Real-time Listeners with error handlers ---
+  // --- Real-time Listeners with Resilient Local Fallbacks ---
 
   subscribeSalas(callback: (salas: Sala[]) => void): () => void {
     if (this.isCloudConnected) {
@@ -415,12 +434,21 @@ class CloudAndLocalSchoolDB {
           callback(list.length > 0 ? list : INITIAL_SALAS);
         },
         (error) => {
-          handleFirestoreError(error, OperationType.GET, path);
+          try {
+            handleFirestoreError(error, OperationType.GET, path);
+          } catch (err) {
+            console.warn(`Firestore onSnapshot notice for ${path}:`, err);
+          }
+          try {
+            const raw = localStorage.getItem('escola_salas');
+            callback(raw ? JSON.parse(raw) : INITIAL_SALAS);
+          } catch {
+            callback(INITIAL_SALAS);
+          }
         }
       );
       return unsubscribe;
     } else {
-      // Local fallback
       try {
         const raw = localStorage.getItem('escola_salas');
         callback(raw ? JSON.parse(raw) : INITIAL_SALAS);
@@ -444,7 +472,17 @@ class CloudAndLocalSchoolDB {
           callback(list.length > 0 ? list : INITIAL_TURMAS);
         },
         (error) => {
-          handleFirestoreError(error, OperationType.GET, path);
+          try {
+            handleFirestoreError(error, OperationType.GET, path);
+          } catch (err) {
+            console.warn(`Firestore onSnapshot notice for ${path}:`, err);
+          }
+          try {
+            const raw = localStorage.getItem('escola_turmas');
+            callback(raw ? JSON.parse(raw) : INITIAL_TURMAS);
+          } catch {
+            callback(INITIAL_TURMAS);
+          }
         }
       );
       return unsubscribe;
@@ -473,7 +511,19 @@ class CloudAndLocalSchoolDB {
           callback(list.length > 0 ? list : INITIAL_PERGUNTAS);
         },
         (error) => {
-          handleFirestoreError(error, OperationType.GET, path);
+          try {
+            handleFirestoreError(error, OperationType.GET, path);
+          } catch (err) {
+            console.warn(`Firestore onSnapshot notice for ${path}:`, err);
+          }
+          try {
+            const raw = localStorage.getItem('escola_perguntas');
+            const list = raw ? JSON.parse(raw) : INITIAL_PERGUNTAS;
+            list.sort((a: Pergunta, b: Pergunta) => a.ordem - b.ordem);
+            callback(list);
+          } catch {
+            callback(INITIAL_PERGUNTAS);
+          }
         }
       );
       return unsubscribe;
@@ -504,7 +554,19 @@ class CloudAndLocalSchoolDB {
           callback(list);
         },
         (error) => {
-          handleFirestoreError(error, OperationType.GET, path);
+          try {
+            handleFirestoreError(error, OperationType.GET, path);
+          } catch (err) {
+            console.warn(`Firestore onSnapshot notice for ${path}:`, err);
+          }
+          try {
+            const raw = localStorage.getItem('escola_respostas');
+            const list = raw ? JSON.parse(raw) : INITIAL_RESPOSTAS;
+            list.sort((a: RespostaEnvio, b: RespostaEnvio) => b.timestamp - a.timestamp);
+            callback(list);
+          } catch {
+            callback(INITIAL_RESPOSTAS);
+          }
         }
       );
       return unsubscribe;
@@ -521,103 +583,134 @@ class CloudAndLocalSchoolDB {
     }
   }
 
-  // --- CRUD Operations ---
+  // --- CRUD Operations with Immediate Local Cache and Cloud Sync ---
 
   async salvarPergunta(pergunta: Pergunta): Promise<void> {
+    this.updateLocalList('escola_perguntas', pergunta);
     if (this.isCloudConnected) {
       const path = `perguntas/${pergunta.id}`;
       try {
         await setDoc(doc(db, 'perguntas', pergunta.id), pergunta);
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, path);
+        try {
+          handleFirestoreError(error, OperationType.WRITE, path);
+        } catch (e) {
+          console.warn('Firestore write notice:', e);
+        }
       }
     }
-    // Also sync to local
-    this.updateLocalList('escola_perguntas', pergunta);
   }
 
   async excluirPergunta(id: string): Promise<void> {
+    this.removeFromLocalList('escola_perguntas', id);
     if (this.isCloudConnected) {
       const path = `perguntas/${id}`;
       try {
         await deleteDoc(doc(db, 'perguntas', id));
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, path);
+        try {
+          handleFirestoreError(error, OperationType.DELETE, path);
+        } catch (e) {
+          console.warn('Firestore delete notice:', e);
+        }
       }
     }
-    this.removeFromLocalList('escola_perguntas', id);
   }
 
   async salvarSala(sala: Sala): Promise<void> {
+    this.updateLocalList('escola_salas', sala);
     if (this.isCloudConnected) {
       const path = `salas/${sala.id}`;
       try {
         await setDoc(doc(db, 'salas', sala.id), sala);
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, path);
+        try {
+          handleFirestoreError(error, OperationType.WRITE, path);
+        } catch (e) {
+          console.warn('Firestore write notice:', e);
+        }
       }
     }
-    this.updateLocalList('escola_salas', sala);
   }
 
   async excluirSala(id: string): Promise<void> {
+    this.removeFromLocalList('escola_salas', id);
     if (this.isCloudConnected) {
       const path = `salas/${id}`;
       try {
         await deleteDoc(doc(db, 'salas', id));
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, path);
+        try {
+          handleFirestoreError(error, OperationType.DELETE, path);
+        } catch (e) {
+          console.warn('Firestore delete notice:', e);
+        }
       }
     }
-    this.removeFromLocalList('escola_salas', id);
   }
 
   async salvarTurma(turma: Turma): Promise<void> {
+    this.updateLocalList('escola_turmas', turma);
     if (this.isCloudConnected) {
       const path = `turmas/${turma.id}`;
       try {
         await setDoc(doc(db, 'turmas', turma.id), turma);
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, path);
+        try {
+          handleFirestoreError(error, OperationType.WRITE, path);
+        } catch (e) {
+          console.warn('Firestore write notice:', e);
+        }
       }
     }
-    this.updateLocalList('escola_turmas', turma);
   }
 
   async excluirTurma(id: string): Promise<void> {
+    this.removeFromLocalList('escola_turmas', id);
     if (this.isCloudConnected) {
       const path = `turmas/${id}`;
       try {
         await deleteDoc(doc(db, 'turmas', id));
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, path);
+        try {
+          handleFirestoreError(error, OperationType.DELETE, path);
+        } catch (e) {
+          console.warn('Firestore delete notice:', e);
+        }
       }
     }
-    this.removeFromLocalList('escola_turmas', id);
   }
 
   async salvarResposta(resposta: RespostaEnvio): Promise<void> {
+    this.updateLocalList('escola_respostas', resposta);
     if (this.isCloudConnected) {
       const path = `respostas/${resposta.id}`;
       try {
         await setDoc(doc(db, 'respostas', resposta.id), resposta);
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, path);
+        try {
+          handleFirestoreError(error, OperationType.WRITE, path);
+        } catch (e) {
+          console.warn('Firestore write notice:', e);
+        }
       }
     }
-    this.updateLocalList('escola_respostas', resposta);
   }
 
   async excluirResposta(id: string): Promise<void> {
+    this.removeFromLocalList('escola_respostas', id);
     if (this.isCloudConnected) {
       const path = `respostas/${id}`;
       try {
         await deleteDoc(doc(db, 'respostas', id));
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, path);
+        try {
+          handleFirestoreError(error, OperationType.DELETE, path);
+        } catch (e) {
+          console.warn('Firestore delete notice:', e);
+        }
       }
     }
-    this.removeFromLocalList('escola_respostas', id);
   }
 
   // --- Reset to Default Seed ---

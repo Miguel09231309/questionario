@@ -43,22 +43,20 @@ export const LoginView: React.FC<LoginViewProps> = ({
       setProfErro('Por favor, informe seu nome como professor(a).');
       return;
     }
-    const salaObj = salas.find((s) => s.id === profSalaId) || salas[0];
     const turmaObj = turmas.find((t) => t.id === profTurmaId) || turmas[0];
 
     onLogin({
       role: 'professor',
       nome: profNome.trim(),
-      salaId: salaObj?.id,
-      salaNome: salaObj?.nome,
+      salaId: 'sala-geral',
+      salaNome: 'Geral',
       turmaId: turmaObj?.id,
       turmaNome: turmaObj?.nome,
     });
   };
 
-  const quickTeacherSelect = (name: string, salaIndex: number, turmaIndex: number) => {
+  const quickTeacherSelect = (name: string, turmaIndex: number) => {
     setProfNome(name);
-    if (salas[salaIndex]) setProfSalaId(salas[salaIndex].id);
     if (turmas[turmaIndex]) setProfTurmaId(turmas[turmaIndex].id);
     setProfErro('');
   };
@@ -272,14 +270,14 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   <span className="text-[11px] text-slate-500 mr-1 self-center">Sugestões rápidas:</span>
                   <button
                     type="button"
-                    onClick={() => quickTeacherSelect('Profª. Sofia Ramos (Português)', 0, 0)}
+                    onClick={() => quickTeacherSelect('Profª. Sofia Ramos (Português)', 0)}
                     className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors"
                   >
                     Profª. Sofia Ramos
                   </button>
                   <button
                     type="button"
-                    onClick={() => quickTeacherSelect('Prof. Ricardo Almeida (Física)', 2, 4)}
+                    onClick={() => quickTeacherSelect('Prof. Ricardo Almeida (Física)', 1)}
                     className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors"
                   >
                     Prof. Ricardo Almeida
@@ -287,40 +285,27 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Sala de Aula *
-                  </label>
-                  <select
-                    value={profSalaId}
-                    onChange={(e) => setProfSalaId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  >
-                    {salas.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Turma / Série *
-                  </label>
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Selecione a Turma que irá avaliar *
+                </label>
+                <div className="relative">
+                  <Users className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <select
                     value={profTurmaId}
                     onChange={(e) => setProfTurmaId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                   >
                     {turmas.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.nome} ({t.turno})
+                        {t.nome} — Turno {t.turno}
                       </option>
                     ))}
                   </select>
                 </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Turmas cadastradas e gerenciadas pela Direção Escolar.
+                </p>
               </div>
 
               {profErro && (

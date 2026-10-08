@@ -39,6 +39,25 @@ export default function App() {
     let unsubRespostas = () => {};
 
     const startSync = async () => {
+      // Immediately load local data so UI renders instantly without waiting for network
+      try {
+        const [pInit, rInit, sInit, tInit] = await Promise.all([
+          dbService.getPerguntas(),
+          dbService.getRespostas(),
+          dbService.getSalas(),
+          dbService.getTurmas(),
+        ]);
+        setPerguntas(pInit);
+        setRespostas(rInit);
+        setSalas(sInit);
+        setTurmas(tInit);
+      } catch (e) {
+        console.warn('Initial local cache read notice:', e);
+      } finally {
+        setIsLoading(false);
+      }
+
+      // Initialize Firestore synchronization in background
       try {
         await dbService.init();
         const info = dbService.getDatabaseInfo();
@@ -51,7 +70,6 @@ export default function App() {
         // Set up real-time snapshot listeners
         unsubSalas = dbService.subscribeSalas((list) => {
           setSalas(list);
-          setIsLoading(false);
         });
 
         unsubTurmas = dbService.subscribeTurmas((list) => {
@@ -66,24 +84,7 @@ export default function App() {
           setRespostas(list);
         });
       } catch (err) {
-        console.error('Falha ao inicializar sincronização com Firestore:', err);
-        // Fallback to one-off read
-        try {
-          const [pList, rList, sList, tList] = await Promise.all([
-            dbService.getPerguntas(),
-            dbService.getRespostas(),
-            dbService.getSalas(),
-            dbService.getTurmas(),
-          ]);
-          setPerguntas(pList);
-          setRespostas(rList);
-          setSalas(sList);
-          setTurmas(tList);
-        } catch (fallbackErr) {
-          console.error('Falha no fallback:', fallbackErr);
-        } finally {
-          setIsLoading(false);
-        }
+        console.warn('Sync connection notice:', err);
       }
     };
 
@@ -155,6 +156,19 @@ export default function App() {
       turno,
     };
     await dbService.salvarTurma(nova);
+  };
+
+  const handleEditTurma = async (
+    id: string,
+    nome: string,
+    turno: 'Manhã' | 'Tarde' | 'Noite' | 'Integral'
+  ) => {
+    const atualizada: Turma = {
+      id,
+      nome,
+      turno,
+    };
+    await dbService.salvarTurma(atualizada);
   };
 
   const handleDeleteTurma = async (id: string) => {
@@ -287,6 +301,7 @@ export default function App() {
             onAddSala={handleAddSala}
             onDeleteSala={handleDeleteSala}
             onAddTurma={handleAddTurma}
+            onEditTurma={handleEditTurma}
             onDeleteTurma={handleDeleteTurma}
             onResetDefaults={handleResetDefaults}
             onExportCsv={handleExportCsv}

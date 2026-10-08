@@ -3,19 +3,2024 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestão Escolar - Questionário de Salas & Turmas</title>
-  <meta name="description" content="Sistema escolar completo para diretores cadastrarem perguntas sobre salas e turmas e professores responderem, com banco de dados em nuvem e alta fidelidade.">
-  <meta property="og:title" content="Gestão Escolar - Questionário de Salas & Turmas">
-  <meta property="og:description" content="Sistema escolar completo com login de diretor e professor, perguntas sobre salas e alunos, formulário em caixas e análise de desempenho.">
-  <meta property="og:type" content="website">
+  <title>Gestão Escolar - Questionário de Salas & Turmas (Autônomo)</title>
+  <meta name="description" content="Sistema escolar autônomo completo em arquivo único: cadastro de perguntas sobre salas e turmas, avaliação com caixas interativas, auto-save debounced e gráfico de radar/barras.">
 
-  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- React 18 & Babel Standalone via CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen selection:bg-indigo-100 selection:text-indigo-900">
   <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+
+  <!-- Main Application Script (Babel/React) -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // ==========================================
+    // EMBEDDED LUCIDE SVG ICONS
+    // ==========================================
+    const Icon = ({ path, className = "w-4 h-4", fill = "none" }) => (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill={fill}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+      >
+        {path}
+      </svg>
+    );
+
+    const Icons = {
+      CheckCircle2: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></>} />,
+      Building: (props) => <Icon {...props} path={<><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/></>} />,
+      Users: (props) => <Icon {...props} path={<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
+      Send: (props) => <Icon {...props} path={<><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></>} />,
+      Star: (props) => <Icon {...props} path={<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>} />,
+      MessageSquare: (props) => <Icon {...props} path={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>} />,
+      HelpCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></>} />,
+      BarChart3: (props) => <Icon {...props} path={<><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>} />,
+      TrendingUp: (props) => <Icon {...props} path={<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>} />,
+      Award: (props) => <Icon {...props} path={<><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></>} />,
+      AlertTriangle: (props) => <Icon {...props} path={<><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>} />,
+      Smile: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></>} />,
+      Meh: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></>} />,
+      Frown: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></>} />,
+      ThumbsUp: (props) => <Icon {...props} path={<><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h3"/><path d="M10 10V4.5a2.5 2.5 0 0 1 5 0V10"/></>} />,
+      LayoutGrid: (props) => <Icon {...props} path={<><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></>} />,
+      ClipboardList: (props) => <Icon {...props} path={<><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></>} />,
+      Calendar: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>} />,
+      Check: (props) => <Icon {...props} path={<polyline points="20 6 9 17 4 12"/>} />,
+      ChevronRight: (props) => <Icon {...props} path={<polyline points="9 18 15 12 9 6"/>} />,
+      ChevronDown: (props) => <Icon {...props} path={<polyline points="6 9 12 15 18 9"/>} />,
+      ChevronUp: (props) => <Icon {...props} path={<polyline points="18 15 12 9 6 15"/>} />,
+      Plus: (props) => <Icon {...props} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />,
+      Trash2: (props) => <Icon {...props} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />,
+      Download: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>} />,
+      Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
+      Sparkles: (props) => <Icon {...props} path={<><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></>} />,
+      RotateCcw: (props) => <Icon {...props} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>} />,
+      Layers: (props) => <Icon {...props} path={<><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>} />,
+      Activity: (props) => <Icon {...props} path={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>} />,
+      GraduationCap: (props) => <Icon {...props} path={<><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></>} />,
+      Pencil: (props) => <Icon {...props} path={<><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></>} />,
+      FileSpreadsheet: (props) => <Icon {...props} path={<><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></>} />,
+    };
+
+    // ==========================================
+    // INITIAL SEED DATA
+    // ==========================================
+    const DEFAULT_SALAS = [
+      { id: 'sala-101', nome: 'Sala 101', bloco: 'Bloco A (Térreo)', capacidade: 35 },
+      { id: 'sala-102', nome: 'Sala 102', bloco: 'Bloco A (Térreo)', capacidade: 35 },
+      { id: 'sala-201', nome: 'Sala 201', bloco: 'Bloco B (1º Andar)', capacidade: 40 },
+      { id: 'sala-202', nome: 'Sala 202 (Multimídia)', bloco: 'Bloco B (1º Andar)', capacidade: 38 },
+      { id: 'lab-info', nome: 'Laboratório de Informática', bloco: 'Bloco Central', capacidade: 32 },
+    ];
+
+    const DEFAULT_TURMAS = [
+      { id: 'turma-6a', nome: '6º Ano A', turno: 'Manhã' },
+      { id: 'turma-7b', nome: '7º Ano B', turno: 'Manhã' },
+      { id: 'turma-8a', nome: '8º Ano A', turno: 'Tarde' },
+      { id: 'turma-9b', nome: '9º Ano B', turno: 'Tarde' },
+      { id: 'turma-1em', nome: '1º Ano EM', turno: 'Manhã' },
+    ];
+
+    const DEFAULT_PERGUNTAS = [
+      {
+        id: 'p-1',
+        enunciado: 'Como está o estado geral de conservação e limpeza da sala de aula (piso, lousa, ventilação)?',
+        categoria: 'sala',
+        tipo: 'escala',
+        obrigatoria: true,
+        ativa: true,
+        ordem: 1,
+      },
+      {
+        id: 'p-2',
+        enunciado: 'Os equipamentos da sala (projetor, TV, lâmpadas, ventilador e tomadas) estão em pleno funcionamento?',
+        categoria: 'sala',
+        tipo: 'sim_nao',
+        obrigatoria: true,
+        ativa: true,
+        ordem: 2,
+      },
+      {
+        id: 'p-3',
+        enunciado: 'Como está o estado das carteiras e cadeiras dos alunos?',
+        categoria: 'sala',
+        tipo: 'multipla_escolha',
+        opcoes: [
+          'Excelente (todas novas e sem avarias)',
+          'Bom (poucas marcas de uso normal)',
+          'Regular (algumas bambas ou riscadas)',
+          'Crítico (necessita reparo ou troca urgente)'
+        ],
+        obrigatoria: true,
+        ativa: true,
+        ordem: 3,
+      },
+      {
+        id: 'p-4',
+        enunciado: 'Como você avalia a atenção, engajamento e participação dos alunos durante a explicação da aula?',
+        categoria: 'turma',
+        tipo: 'escala',
+        obrigatoria: true,
+        ativa: true,
+        ordem: 4,
+      },
+      {
+        id: 'p-5',
+        enunciado: 'Os alunos trouxeram os materiais pedagógicos (livros, cadernos) e entregaram as atividades de casa?',
+        categoria: 'turma',
+        tipo: 'multipla_escolha',
+        opcoes: [
+          'Quase a totalidade (acima de 90%)',
+          'Maioria dos alunos (70% a 90%)',
+          'Cerca da metade da turma (50%)',
+          'Minoria ou índice insuficiente (<50%)'
+        ],
+        obrigatoria: true,
+        ativa: true,
+        ordem: 5,
+      },
+      {
+        id: 'p-6',
+        enunciado: 'Houve alguma ocorrência disciplinar grave, conflitos entre alunos ou necessidade de mediação pedagógica?',
+        categoria: 'turma',
+        tipo: 'sim_nao',
+        obrigatoria: true,
+        ativa: true,
+        ordem: 6,
+      },
+      {
+        id: 'p-8',
+        enunciado: 'Como você avalia o ritmo de compreensão e assimilação do conteúdo pelos alunos nesta aula?',
+        categoria: 'turma',
+        tipo: 'escala',
+        obrigatoria: true,
+        ativa: true,
+        ordem: 7,
+      },
+      {
+        id: 'p-9',
+        enunciado: 'Houve dispersão dos alunos causada por conversas paralelas ou uso indevido de celulares/eletrônicos?',
+        categoria: 'turma',
+        tipo: 'multipla_escolha',
+        opcoes: [
+          'Não, os alunos mantiveram foco exemplar',
+          'Poucos casos pontuais e rapidamente solucionados',
+          'Dispersão moderada em alguns grupos de alunos',
+          'Dispersão frequente que prejudicou o andamento da aula'
+        ],
+        obrigatoria: true,
+        ativa: true,
+        ordem: 8,
+      },
+      {
+        id: 'p-10',
+        enunciado: 'Foram identificados alunos com defasagem acentuada ou que necessitam de reforço / apoio pedagógico específico?',
+        categoria: 'turma',
+        tipo: 'sim_nao',
+        obrigatoria: true,
+        ativa: true,
+        ordem: 9,
+      },
+      {
+        id: 'p-14',
+        enunciado: 'Cite nomes de alunos que se destacaram positivamente (liderança, empenho) ou que necessitam de apoio individual:',
+        categoria: 'turma',
+        tipo: 'texto',
+        obrigatoria: false,
+        ativa: true,
+        ordem: 10,
+      },
+      {
+        id: 'p-7',
+        enunciado: 'Descreva observações adicionais, elogios ou solicitações de melhorias para a direção e coordenação:',
+        categoria: 'geral',
+        tipo: 'texto',
+        obrigatoria: false,
+        ativa: true,
+        ordem: 11,
+      },
+    ];
+
+    const DEFAULT_RESPOSTAS = [
+      {
+        id: 'resp-1',
+        professorNome: 'Prof. Carlos Eduardo (Matemática)',
+        salaId: 'sala-101',
+        salaNome: 'Sala 101',
+        turmaId: 'turma-6a',
+        turmaNome: '6º Ano A',
+        respostas: {
+          'p-1': 'Ótimo',
+          'p-2': 'Sim',
+          'p-3': 'Excelente (todas novas e sem avarias)',
+          'p-4': 'Ótimo',
+          'p-5': 'Maioria dos alunos (70% a 90%)',
+          'p-6': 'Não',
+          'p-8': 'Ótimo',
+          'p-9': 'Não, os alunos mantiveram foco exemplar',
+          'p-10': 'Não',
+          'p-14': 'Aluna Beatriz e aluno Lucas com excelente participação e foco nos exercícios de frações.',
+          'p-7': 'A aula fluiu com excelente rendimento. A turma demonstrou muito interesse nas dinâmicas.',
+        },
+        observacoesGerais: 'A aula fluiu com excelente rendimento. A turma demonstrou muito interesse nas dinâmicas.',
+        criadaEm: '2026-10-01T10:30:00.000Z',
+        timestamp: 1790850600000,
+      },
+      {
+        id: 'resp-2',
+        professorNome: 'Profa. Mariana Souza (Português)',
+        salaId: 'sala-102',
+        salaNome: 'Sala 102',
+        turmaId: 'turma-7b',
+        turmaNome: '7º Ano B',
+        respostas: {
+          'p-1': 'Bom',
+          'p-2': 'Sim',
+          'p-3': 'Bom (poucas marcas de uso normal)',
+          'p-4': 'Bom',
+          'p-5': 'Maioria dos alunos (70% a 90%)',
+          'p-6': 'Não',
+          'p-8': 'Bom',
+          'p-9': 'Poucos casos pontuais e rapidamente solucionados',
+          'p-10': 'Sim',
+          'p-14': 'Aluno Matheus necessita de acompanhamento na leitura e interpretação de textos.',
+          'p-7': 'Ventilação da sala estava um pouco abafada, sugiro manutenção no segundo ventilador.',
+        },
+        observacoesGerais: 'Ventilação da sala estava um pouco abafada, sugiro manutenção no segundo ventilador.',
+        criadaEm: '2026-10-02T14:15:00.000Z',
+        timestamp: 1790950500000,
+      },
+    ];
+
+    // ==========================================
+    // LOCAL STORAGE REPOSITORY
+    // ==========================================
+    const StorageService = {
+      getSalas: () => {
+        try {
+          const raw = localStorage.getItem('escola_salas');
+          return raw ? JSON.parse(raw) : DEFAULT_SALAS;
+        } catch { return DEFAULT_SALAS; }
+      },
+      setSalas: (salas) => localStorage.setItem('escola_salas', JSON.stringify(salas)),
+
+      getTurmas: () => {
+        try {
+          const raw = localStorage.getItem('escola_turmas');
+          return raw ? JSON.parse(raw) : DEFAULT_TURMAS;
+        } catch { return DEFAULT_TURMAS; }
+      },
+      setTurmas: (turmas) => localStorage.setItem('escola_turmas', JSON.stringify(turmas)),
+
+      getPerguntas: () => {
+        try {
+          const raw = localStorage.getItem('escola_perguntas');
+          const list = raw ? JSON.parse(raw) : DEFAULT_PERGUNTAS;
+          list.sort((a, b) => a.ordem - b.ordem);
+          return list;
+        } catch { return DEFAULT_PERGUNTAS; }
+      },
+      setPerguntas: (perguntas) => localStorage.setItem('escola_perguntas', JSON.stringify(perguntas)),
+
+      getRespostas: () => {
+        try {
+          const raw = localStorage.getItem('escola_respostas');
+          const list = raw ? JSON.parse(raw) : DEFAULT_RESPOSTAS;
+          list.sort((a, b) => b.timestamp - a.timestamp);
+          return list;
+        } catch { return DEFAULT_RESPOSTAS; }
+      },
+      setRespostas: (respostas) => localStorage.setItem('escola_respostas', JSON.stringify(respostas)),
+
+      resetAll: () => {
+        localStorage.setItem('escola_salas', JSON.stringify(DEFAULT_SALAS));
+        localStorage.setItem('escola_turmas', JSON.stringify(DEFAULT_TURMAS));
+        localStorage.setItem('escola_perguntas', JSON.stringify(DEFAULT_PERGUNTAS));
+        localStorage.setItem('escola_respostas', JSON.stringify(DEFAULT_RESPOSTAS));
+      }
+    };
+
+    // ==============================================================
+    // NATIVE SVG RADAR & BAR CHART (100% AUTÔNOMO SEM DEPENDÊNCIAS)
+    // ==============================================================
+    const CategoryCharts = ({ dadosCategorias, tipoGrafico, setTipoGrafico }) => {
+      const [hoveredIndex, setHoveredIndex] = useState(null);
+
+      // Radar Calculations (Center: 150, 150, Radius: 105)
+      const cx = 160;
+      const cy = 150;
+      const r = 95;
+      const count = dadosCategorias.length;
+
+      const getCoordinates = (value, index) => {
+        const angle = (Math.PI * 2 / count) * index - Math.PI / 2;
+        const normalized = Math.max(0, Math.min(5, value)) / 5;
+        const currentR = r * normalized;
+        return {
+          x: cx + currentR * Math.cos(angle),
+          y: cy + currentR * Math.sin(angle),
+        };
+      };
+
+      // Radar points for the polygon
+      const pointsString = dadosCategorias
+        .map((d, i) => {
+          const { x, y } = getCoordinates(d.media, i);
+          return `${x},${y}`;
+        })
+        .join(' ');
+
+      return (
+        <div className="w-full flex flex-col items-center">
+          {tipoGrafico === 'radar' ? (
+            <div className="relative w-full max-w-sm flex items-center justify-center py-2">
+              <svg viewBox="0 0 320 300" className="w-full h-72 overflow-visible">
+                {/* Background Concentric Polygons */}
+                {[1, 2, 3, 4, 5].map((level) => {
+                  const levelPoints = dadosCategorias
+                    .map((_, i) => {
+                      const { x, y } = getCoordinates(level, i);
+                      return `${x},${y}`;
+                    })
+                    .join(' ');
+
+                  return (
+                    <polygon
+                      key={level}
+                      points={levelPoints}
+                      fill="none"
+                      stroke="#e2e8f0"
+                      strokeWidth="1.2"
+                      strokeDasharray={level < 5 ? "3 3" : undefined}
+                    />
+                  );
+                })}
+
+                {/* Axes radiating from center */}
+                {dadosCategorias.map((d, i) => {
+                  const end = getCoordinates(5, i);
+                  return (
+                    <line
+                      key={i}
+                      x1={cx}
+                      y1={cy}
+                      x2={end.x}
+                      y2={end.y}
+                      stroke="#cbd5e1"
+                      strokeWidth="1"
+                    />
+                  );
+                })}
+
+                {/* Filled Radar Area */}
+                <polygon
+                  points={pointsString}
+                  fill="#10b981"
+                  fillOpacity="0.4"
+                  stroke="#059669"
+                  strokeWidth="2.5"
+                  className="transition-all duration-300"
+                />
+
+                {/* Data Points */}
+                {dadosCategorias.map((d, i) => {
+                  const { x, y } = getCoordinates(d.media, i);
+                  const isHovered = hoveredIndex === i;
+
+                  return (
+                    <g key={i} onMouseEnter={() => setHoveredIndex(i)} onMouseLeave={() => setHoveredIndex(null)}>
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={isHovered ? 7 : 4.5}
+                        fill={d.cor}
+                        stroke="#ffffff"
+                        strokeWidth="2"
+                        className="cursor-pointer transition-all"
+                      />
+                    </g>
+                  );
+                })}
+
+                {/* Axis Labels */}
+                {dadosCategorias.map((d, i) => {
+                  const labelCoord = getCoordinates(5.9, i);
+                  let textAnchor = "middle";
+                  if (labelCoord.x > cx + 15) textAnchor = "start";
+                  else if (labelCoord.x < cx - 15) textAnchor = "end";
+
+                  return (
+                    <text
+                      key={i}
+                      x={labelCoord.x}
+                      y={labelCoord.y + 4}
+                      textAnchor={textAnchor}
+                      fill="#334155"
+                      fontSize="10.5"
+                      fontWeight="700"
+                      className="select-none"
+                    >
+                      {d.categoria}
+                    </text>
+                  );
+                })}
+              </svg>
+
+              {/* Hover Tooltip Overlay */}
+              {hoveredIndex !== null && (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xs text-white px-3 py-2 rounded-xl shadow-xl text-xs border border-slate-700 pointer-events-none z-20">
+                  <span className="font-bold text-emerald-400 mr-2">{dadosCategorias[hoveredIndex].categoria}:</span>
+                  <span className="font-mono font-extrabold text-white">{dadosCategorias[hoveredIndex].media.toFixed(1)} / 5.0 ★</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Bar Chart
+            <div className="w-full space-y-4 py-3">
+              {dadosCategorias.map((d, i) => {
+                const percent = Math.min(100, Math.round((d.media / 5) * 100));
+                return (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.cor }} />
+                        <span className="font-bold text-slate-800">{d.categoria}</span>
+                      </div>
+                      <span className="font-mono font-extrabold text-slate-900 flex items-center gap-1">
+                        <Icons.Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        {d.media.toFixed(1)} / 5.0
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-200/80 h-3 rounded-full overflow-hidden p-0.5">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${percent}%`, backgroundColor: d.cor }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ==========================================
+    // MAIN APP COMPONENT
+    // ==========================================
+    function App() {
+      // Global App States
+      const [role, setRole] = useState('professor'); // 'diretor' | 'professor'
+      const [professorNome, setProfessorNome] = useState('Prof. Carlos Eduardo (Matemática)');
+
+      // Entities
+      const [salas, setSalas] = useState([]);
+      const [turmas, setTurmas] = useState([]);
+      const [perguntas, setPerguntas] = useState([]);
+      const [respostas, setRespostas] = useState([]);
+
+      // Session Selection for Teacher
+      const [selectedSalaId, setSelectedSalaId] = useState('');
+      const [selectedTurmaId, setSelectedTurmaId] = useState('');
+      const [showChangeModal, setShowChangeModal] = useState(false);
+
+      // Teacher Tab & Questionnaire Form States
+      const [teacherTab, setTeacherTab] = useState('responder'); // 'responder' | 'desempenho' | 'panorama'
+      const [respostasState, setRespostasState] = useState({});
+      const [observacoesAdicionais, setObservacoesAdicionais] = useState('');
+      const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+      const [lastSavedTime, setLastSavedTime] = useState(null);
+      const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+      const [showSuccessCard, setShowSuccessCard] = useState(false);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const isInitialMount = useRef(true);
+
+      // Chart Mode for Teacher Desempenho
+      const [tipoGrafico, setTipoGrafico] = useState('radar'); // 'radar' | 'barras'
+      const [selectedTurmaDesempenho, setSelectedTurmaDesempenho] = useState('');
+
+      // Director View States
+      const [directorTab, setDirectorTab] = useState('dashboard'); // 'dashboard' | 'salas' | 'turmas' | 'perguntas' | 'respostas'
+      const [filtroTurmaDirector, setFiltroTurmaDirector] = useState('todos');
+      const [filtroBuscaDirector, setFiltroBuscaDirector] = useState('');
+      const [expandedRespostaId, setExpandedRespostaId] = useState(null);
+
+      // Modal forms for Director CRUD
+      const [novaSalaNome, setNovaSalaNome] = useState('');
+      const [novaSalaBloco, setNovaSalaBloco] = useState('');
+      const [novaSalaCapacidade, setNovaSalaCapacidade] = useState(35);
+
+      const [novaTurmaNome, setNovaTurmaNome] = useState('');
+      const [novaTurmaTurno, setNovaTurmaTurno] = useState('Manhã');
+
+      const [novaPerguntaEnunciado, setNovaPerguntaEnunciado] = useState('');
+      const [novaPerguntaCategoria, setNovaPerguntaCategoria] = useState('turma');
+      const [novaPerguntaTipo, setNovaPerguntaTipo] = useState('escala');
+      const [novaPerguntaObrigatoria, setNovaPerguntaObrigatoria] = useState(true);
+
+      // Boot Data on Load
+      useEffect(() => {
+        const s = StorageService.getSalas();
+        const t = StorageService.getTurmas();
+        const p = StorageService.getPerguntas();
+        const r = StorageService.getRespostas();
+
+        setSalas(s);
+        setTurmas(t);
+        setPerguntas(p);
+        setRespostas(r);
+
+        if (s.length > 0) setSelectedSalaId(s[0].id);
+        if (t.length > 0) {
+          setSelectedTurmaId(t[0].id);
+          setSelectedTurmaDesempenho(t[0].id);
+        }
+      }, []);
+
+      // Selected Objects Helpers
+      const activeSala = salas.find((s) => s.id === selectedSalaId) || salas[0] || { nome: 'Sala Geral' };
+      const activeTurma = turmas.find((t) => t.id === selectedTurmaId) || turmas[0] || { nome: 'Turma Geral' };
+      const activePerguntas = perguntas.filter((p) => p.ativa);
+
+      // Unique Draft Keys per teacher and class
+      const draftKey = `escola_draft_obs_${professorNome}_${selectedTurmaId || 'geral'}`;
+      const draftRespostasKey = `escola_draft_respostas_${professorNome}_${selectedTurmaId || 'geral'}`;
+
+      // ==============================================================
+      // RESTORE PROGRESS ON SESSION INTERRUPTION (DEBOUNCED AUTO-SAVE)
+      // ==============================================================
+      useEffect(() => {
+        isInitialMount.current = true;
+        try {
+          const savedObs = localStorage.getItem(draftKey);
+          const savedResp = localStorage.getItem(draftRespostasKey);
+          let found = false;
+
+          if (savedObs) {
+            setObservacoesAdicionais(savedObs);
+            found = true;
+          }
+
+          if (savedResp) {
+            const parsed = JSON.parse(savedResp);
+            if (parsed && typeof parsed === 'object') {
+              setRespostasState(parsed);
+              found = true;
+            }
+          }
+
+          if (found) {
+            setHasRestoredDraft(true);
+            setAutoSaveStatus('saved');
+            const now = new Date();
+            setLastSavedTime(now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+          } else {
+            setHasRestoredDraft(false);
+            setAutoSaveStatus('idle');
+          }
+        } catch (e) {
+          console.warn('Erro ao carregar rascunho:', e);
+        }
+      }, [draftKey, draftRespostasKey]);
+
+      // Debounced Auto-Save (600ms)
+      useEffect(() => {
+        if (isInitialMount.current) {
+          isInitialMount.current = false;
+          return;
+        }
+
+        setAutoSaveStatus('saving');
+        const timer = setTimeout(() => {
+          try {
+            if (observacoesAdicionais.trim()) {
+              localStorage.setItem(draftKey, observacoesAdicionais);
+            } else {
+              localStorage.removeItem(draftKey);
+            }
+
+            if (Object.keys(respostasState).length > 0) {
+              localStorage.setItem(draftRespostasKey, JSON.stringify(respostasState));
+            }
+
+            const now = new Date();
+            setLastSavedTime(now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            setAutoSaveStatus('saved');
+          } catch (err) {
+            setAutoSaveStatus('idle');
+          }
+        }, 600);
+
+        return () => clearTimeout(timer);
+      }, [observacoesAdicionais, respostasState, draftKey, draftRespostasKey]);
+
+      const handleClearDraft = () => {
+        try {
+          localStorage.removeItem(draftKey);
+          localStorage.removeItem(draftRespostasKey);
+        } catch {}
+        setObservacoesAdicionais('');
+        setRespostasState({});
+        setHasRestoredDraft(false);
+        setAutoSaveStatus('idle');
+        setLastSavedTime(null);
+      };
+
+      const handleSetValor = (perguntaId, valor) => {
+        setRespostasState((prev) => ({ ...prev, [perguntaId]: valor }));
+      };
+
+      const isObsQuestion = (p) =>
+        p.id === 'p-7' || p.enunciado.toLowerCase().includes('observações adicionais');
+
+      // Submit Evaluation Form
+      const handleSubmit = (e) => {
+        e.preventDefault();
+
+        // Validate mandatory
+        for (const p of activePerguntas) {
+          if (p.obrigatoria) {
+            const val = isObsQuestion(p) ? (observacoesAdicionais || respostasState[p.id]) : respostasState[p.id];
+            if (val === undefined || val === '') {
+              alert(`Por favor, responda a pergunta obrigatória:\n"${p.enunciado}"`);
+              return;
+            }
+          }
+        }
+
+        setIsSubmitting(true);
+        setTimeout(() => {
+          const finalRespostas = { ...respostasState };
+          const obsQ = activePerguntas.find((p) => isObsQuestion(p));
+          if (obsQ && observacoesAdicionais) {
+            finalRespostas[obsQ.id] = observacoesAdicionais;
+          }
+
+          const now = Date.now();
+          const novaResposta = {
+            id: 'resp-' + now,
+            professorNome: professorNome,
+            salaId: activeSala.id,
+            salaNome: activeSala.nome,
+            turmaId: activeTurma.id,
+            turmaNome: activeTurma.nome,
+            respostas: finalRespostas,
+            observacoesGerais: observacoesAdicionais.trim() || undefined,
+            criadaEm: new Date(now).toISOString(),
+            timestamp: now,
+          };
+
+          const updated = [novaResposta, ...respostas];
+          setRespostas(updated);
+          StorageService.setRespostas(updated);
+
+          // Clear draft
+          handleClearDraft();
+          setSelectedTurmaDesempenho(activeTurma.id);
+          setIsSubmitting(false);
+          setShowSuccessCard(true);
+        }, 400);
+      };
+
+      // Download this single HTML file directly to user machine
+      const handleDownloadStandaloneHTML = () => {
+        const htmlContent = document.documentElement.outerHTML;
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'gestao-escolar-questionario.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      // Export Responses as CSV
+      const handleExportCSV = () => {
+        let csv = 'ID;Professor;Turma;Sala;Data;Observacoes Gerais\n';
+        respostas.forEach((r) => {
+          const dataFormatada = new Date(r.timestamp).toLocaleDateString('pt-BR');
+          const obs = (r.observacoesGerais || '').replace(/[\n\r;]/g, ' ');
+          csv += `"${r.id}";"${r.professorNome}";"${r.turmaNome}";"${r.salaNome}";"${dataFormatada}";"${obs}"\n`;
+        });
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'relatorio_respostas_escola.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+
+      // Helper for Caixa Avaliação
+      const caixasOpcoes = [
+        { tipo: 'Ótimo', nota: 5, label: 'Ótimo', sublabel: 'Excelente / Acima do esperado', icon: Icons.ThumbsUp, bg: 'bg-emerald-50/50', border: 'border-emerald-200', text: 'text-emerald-800', activeBg: 'bg-emerald-600 text-white shadow-xs' },
+        { tipo: 'Bom', nota: 4, label: 'Bom', sublabel: 'Adequado / Dentro do padrão', icon: Icons.Smile, bg: 'bg-sky-50/50', border: 'border-sky-200', text: 'text-sky-800', activeBg: 'bg-sky-600 text-white shadow-xs' },
+        { tipo: 'Regular', nota: 3, label: 'Regular', sublabel: 'Abaixo do ideal / Atenção', icon: Icons.Meh, bg: 'bg-amber-50/50', border: 'border-amber-200', text: 'text-amber-800', activeBg: 'bg-amber-600 text-white shadow-xs' },
+        { tipo: 'Ruim', nota: 1, label: 'Ruim', sublabel: 'Crítico / Requer intervenção', icon: Icons.Frown, bg: 'bg-rose-50/50', border: 'border-rose-200', text: 'text-rose-800', activeBg: 'bg-rose-600 text-white shadow-xs' },
+      ];
+
+      // Categories computation for Recharts / SVG Radar & Bar Chart
+      const calcularMediasCategorias = (turmaId) => {
+        const respostasDaTurma = respostas.filter((r) => r.turmaId === turmaId);
+        const categoriasBase = {
+          turma: { nome: 'Comportamento da Turma', descricao: 'Foco, pontualidade, disciplina e participação em sala', cor: '#10b981', notas: [] },
+          sala: { nome: 'Estrutura & Recursos', descricao: 'Equipamentos, materiais didáticos e ambiente físico', cor: '#0ea5e9', notas: [] },
+          geral: { nome: 'Geral & Pedagógico', descricao: 'Clima escolar, desenvolvimento das aulas e melhorias', cor: '#6366f1', notas: [] },
+        };
+
+        respostasDaTurma.forEach((resp) => {
+          Object.entries(resp.respostas).forEach(([pid, val]) => {
+            const pergunta = perguntas.find((p) => p.id === pid);
+            if (!pergunta) return;
+            const cat = pergunta.categoria;
+            if (!categoriasBase[cat]) return;
+
+            let notaNum = null;
+            if (typeof val === 'number') notaNum = val;
+            else if (typeof val === 'string') {
+              if (val === 'Ótimo') notaNum = 5;
+              else if (val === 'Bom') notaNum = 4;
+              else if (val === 'Regular') notaNum = 3;
+              else if (val === 'Ruim') notaNum = 1;
+              else if (val === 'Sim') {
+                const isNeg = pergunta.enunciado.toLowerCase().includes('ocorrência') || pergunta.enunciado.toLowerCase().includes('grave');
+                notaNum = isNeg ? 1.5 : 5;
+              } else if (val === 'Não') {
+                const isNeg = pergunta.enunciado.toLowerCase().includes('ocorrência') || pergunta.enunciado.toLowerCase().includes('grave');
+                notaNum = isNeg ? 5 : 2;
+              } else if (pergunta.opcoes && pergunta.opcoes.length > 0) {
+                const idx = pergunta.opcoes.indexOf(val);
+                if (idx !== -1) notaNum = Number((5 - idx * (3 / Math.max(1, pergunta.opcoes.length - 1))).toFixed(1));
+              }
+            }
+
+            if (notaNum !== null && !isNaN(notaNum)) {
+              categoriasBase[cat].notas.push(notaNum);
+            }
+          });
+        });
+
+        return Object.entries(categoriasBase).map(([catKey, data]) => {
+          const media = data.notas.length > 0 ? Number((data.notas.reduce((a, b) => a + b, 0) / data.notas.length).toFixed(1)) : 0;
+          return {
+            key: catKey,
+            categoria: data.nome,
+            descricao: data.descricao,
+            media,
+            totalRespostas: data.notas.length,
+            cor: data.cor,
+          };
+        });
+      };
+
+      // Overall Metrics for selected class
+      const getTurmaMetrics = (turmaId) => {
+        const respostasDaTurma = respostas.filter((r) => r.turmaId === turmaId);
+        if (respostasDaTurma.length === 0) {
+          return { totalAvaliacoes: 0, mediaNota: 0, status: 'Sem avaliações', corStatus: 'text-slate-500 bg-slate-100', ocorrenciasCount: 0 };
+        }
+        let totalNotas = [];
+        let ocorrencias = 0;
+        respostasDaTurma.forEach((r) => {
+          Object.entries(r.respostas).forEach(([pid, val]) => {
+            if (val === 'Ótimo') totalNotas.push(5);
+            else if (val === 'Bom') totalNotas.push(4);
+            else if (val === 'Regular') totalNotas.push(3);
+            else if (val === 'Ruim') totalNotas.push(1);
+            if (pid === 'p-6' && val === 'Sim') ocorrencias++;
+          });
+        });
+        const media = totalNotas.length > 0 ? Number((totalNotas.reduce((a, b) => a + b, 0) / totalNotas.length).toFixed(1)) : 4.0;
+        let status = 'Ótimo';
+        let corStatus = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+        if (media < 2.5) { status = 'Atenção Crítica'; corStatus = 'text-rose-700 bg-rose-50 border-rose-200'; }
+        else if (media < 3.5) { status = 'Regular'; corStatus = 'text-amber-700 bg-amber-50 border-amber-200'; }
+        else if (media < 4.4) { status = 'Bom'; corStatus = 'text-sky-700 bg-sky-50 border-sky-200'; }
+        return { totalAvaliacoes: respostasDaTurma.length, mediaNota: media, status, corStatus, ocorrenciasCount: ocorrencias };
+      };
+
+      const respondidasCount = activePerguntas.filter((p) => {
+        const val = isObsQuestion(p) ? (observacoesAdicionais || respostasState[p.id]) : respostasState[p.id];
+        return val !== undefined && val !== '';
+      }).length;
+      const progressPercent = activePerguntas.length > 0 ? Math.round((respondidasCount / activePerguntas.length) * 100) : 0;
+
+      // Filtered responses for director view
+      const filteredRespostasDirector = respostas.filter((r) => {
+        const matchTurma = filtroTurmaDirector === 'todos' || r.turmaId === filtroTurmaDirector;
+        const matchBusca = !filtroBuscaDirector ||
+          r.professorNome.toLowerCase().includes(filtroBuscaDirector.toLowerCase()) ||
+          r.turmaNome.toLowerCase().includes(filtroBuscaDirector.toLowerCase());
+        return matchTurma && matchBusca;
+      });
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-50">
+          {/* ============================================================== */}
+          {/* TOP APP HEADER & NAVIGATION BAR                                */}
+          {/* ============================================================== */}
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Icons.GraduationCap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h1 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight">
+                    Gestão Escolar
+                  </h1>
+                  <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+                    Questionário de Salas & Turmas (Arquivo Único Autônomo)
+                  </p>
+                </div>
+              </div>
+
+              {/* Right Action Bar */}
+              <div className="flex items-center gap-2.5">
+                {/* Download Standalone Button */}
+                <button
+                  onClick={handleDownloadStandaloneHTML}
+                  title="Baixar este arquivo HTML para rodar 100% offline em qualquer computador"
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Icons.Download className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="hidden md:inline">Baixar index.html</span>
+                </button>
+
+                {/* Profile Switcher (Diretor / Professor) */}
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    onClick={() => setRole('professor')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      role === 'professor'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Icons.Users className="w-3.5 h-3.5" />
+                    <span>Professor</span>
+                  </button>
+                  <button
+                    onClick={() => setRole('diretor')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      role === 'diretor'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Icons.Award className="w-3.5 h-3.5" />
+                    <span>Diretor</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* ============================================================== */}
+          {/* ROLE: PROFESSOR PORTAL                                         */}
+          {/* ============================================================== */}
+          {role === 'professor' && (
+            <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 w-full flex-1">
+              {/* Teacher Header Banner */}
+              <div className="bg-gradient-to-r from-emerald-700 via-teal-800 to-indigo-900 rounded-2xl p-6 text-white shadow-xs mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-400/40 text-[11px] font-semibold text-emerald-100 mb-2">
+                      <Icons.CheckCircle2 className="w-3.5 h-3.5" />
+                      Portal do Docente Ativo &bull; Local Storage
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+                      {professorNome}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-3 mt-2 text-xs sm:text-sm text-emerald-100 font-medium">
+                      <span className="flex items-center gap-1.5 bg-black/20 px-3 py-1.5 rounded-lg border border-white/10">
+                        <Icons.Users className="w-4 h-4 text-emerald-300" />
+                        Turma: <strong className="text-white ml-1">{activeTurma.nome}</strong>
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-black/20 px-3 py-1.5 rounded-lg border border-white/10">
+                        <Icons.Building className="w-4 h-4 text-emerald-300" />
+                        Sala: <strong className="text-white ml-1">{activeSala.nome}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowChangeModal(true)}
+                    className="px-4 py-2 bg-white/15 hover:bg-white/25 border border-white/25 rounded-xl text-xs font-semibold text-white transition-colors cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+                  >
+                    <Icons.Users className="w-3.5 h-3.5" />
+                    <span>Mudar de Turma / Sala</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Teacher Tabs */}
+              <div className="flex items-center gap-2 border-b border-slate-200 mb-6 overflow-x-auto">
+                <button
+                  onClick={() => { setTeacherTab('responder'); setShowSuccessCard(false); }}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                    teacherTab === 'responder'
+                      ? 'border-emerald-600 text-emerald-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Icons.ClipboardList className="w-4 h-4" />
+                  <span>Responder Questionário</span>
+                </button>
+                <button
+                  onClick={() => setTeacherTab('desempenho')}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                    teacherTab === 'desempenho'
+                      ? 'border-emerald-600 text-emerald-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Icons.BarChart3 className="w-4 h-4" />
+                  <span>Desempenho da Turma ({activeTurma.nome})</span>
+                </button>
+                <button
+                  onClick={() => setTeacherTab('panorama')}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                    teacherTab === 'panorama'
+                      ? 'border-emerald-600 text-emerald-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Icons.LayoutGrid className="w-4 h-4" />
+                  <span>Panorama Geral das Turmas ({turmas.length})</span>
+                </button>
+              </div>
+
+              {/* TAB 1: QUESTIONÁRIO */}
+              {teacherTab === 'responder' && (
+                <div>
+                  {showSuccessCard ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 text-center shadow-xs animate-fade-in">
+                      <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+                        <Icons.CheckCircle2 className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                        Respostas Gravadas com Sucesso!
+                      </h3>
+                      <p className="text-sm text-slate-600 max-w-md mx-auto mt-2">
+                        A avaliação pedagógica da turma <strong>{activeTurma.nome}</strong> na <strong>{activeSala.nome}</strong> foi armazenada no navegador.
+                      </p>
+                      <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button
+                          onClick={() => setTeacherTab('desempenho')}
+                          className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                        >
+                          Ver Gráficos de Desempenho
+                        </button>
+                        <button
+                          onClick={() => { setShowSuccessCard(false); setRespostasState({}); }}
+                          className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                        >
+                          Nova Avaliação
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Progress Bar */}
+                      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">
+                            Questionário da Aula: {activeTurma.nome} &bull; {activeSala.nome}
+                          </h3>
+                          <p className="text-xs text-slate-500">
+                            Avalie a aula utilizando as caixas interativas e seletores.
+                          </p>
+                        </div>
+                        <div className="sm:text-right">
+                          <div className="text-xs font-semibold text-slate-700">
+                            Progresso: <span className="font-mono text-emerald-700">{respondidasCount}</span> de{' '}
+                            <span className="font-mono">{activePerguntas.length}</span> respondidas
+                          </div>
+                          <div className="w-full sm:w-48 bg-slate-100 h-2 rounded-full overflow-hidden mt-1.5">
+                            <div className="bg-emerald-600 h-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Draft Recovered Banner */}
+                      {hasRestoredDraft && (
+                        <div className="mb-5 p-3.5 bg-indigo-50 border border-indigo-200/90 text-indigo-950 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs animate-fade-in">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                              <Icons.Sparkles className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="font-bold block text-indigo-900">Rascunho recuperado com sucesso</span>
+                              <span className="text-slate-600 text-[11px]">
+                                Suas observações adicionais e respostas foram restauradas localmente da sessão anterior.
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleClearDraft}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-md transition-colors cursor-pointer"
+                          >
+                            Descartar Rascunho
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Questionnaire Form */}
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        {activePerguntas.map((p, idx) => {
+                          const isObs = isObsQuestion(p);
+                          const valorAtual = isObs ? (observacoesAdicionais || respostasState[p.id]) : respostasState[p.id];
+                          const foiRespondida = valorAtual !== undefined && valorAtual !== '';
+
+                          return (
+                            <div
+                              key={p.id}
+                              className={`bg-white rounded-xl border p-5 transition-all ${
+                                foiRespondida ? 'border-emerald-200 ring-1 ring-emerald-100 shadow-2xs' : 'border-slate-200 shadow-xs'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3 mb-3">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-bold text-slate-400 font-mono">#{idx + 1}</span>
+                                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">
+                                      {p.categoria === 'sala' ? 'Sala' : p.categoria === 'turma' ? 'Alunos / Turma' : 'Geral'}
+                                    </span>
+                                    {p.obrigatoria && (
+                                      <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                                        Obrigatória
+                                      </span>
+                                    )}
+                                  </div>
+                                  <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                                    {p.enunciado}
+                                  </h4>
+                                </div>
+                                {foiRespondida && (
+                                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                    <Icons.Check className="w-3.5 h-3.5" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Input Types */}
+                              <div className="mt-3">
+                                {p.tipo === 'escala' && (
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                    {caixasOpcoes.map((cx) => {
+                                      const IconComp = cx.icon;
+                                      const isSelected = valorAtual === cx.tipo || valorAtual === cx.nota;
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={cx.tipo}
+                                          onClick={() => handleSetValor(p.id, cx.tipo)}
+                                          className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                                            isSelected ? cx.activeBg : `${cx.bg} ${cx.border} text-slate-700 hover:border-slate-300`
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-extrabold uppercase tracking-wide">{cx.label}</span>
+                                            <IconComp className={`w-4 h-4 ${isSelected ? 'text-white' : cx.text}`} />
+                                          </div>
+                                          <span className={`text-[10px] line-clamp-1 ${isSelected ? 'text-white/90' : 'text-slate-500'}`}>
+                                            {cx.sublabel}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {p.tipo === 'sim_nao' && (
+                                  <div className="flex items-center gap-3">
+                                    {['Sim', 'Não'].map((opt) => (
+                                      <button
+                                        type="button"
+                                        key={opt}
+                                        onClick={() => handleSetValor(p.id, opt)}
+                                        className={`px-7 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                          valorAtual === opt
+                                            ? opt === 'Sim' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-800 text-white shadow-xs'
+                                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                                        }`}
+                                      >
+                                        {opt}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {p.tipo === 'multipla_escolha' && (
+                                  <div className="space-y-2">
+                                    {(p.opcoes || []).map((opt, i) => (
+                                      <label
+                                        key={i}
+                                        onClick={() => handleSetValor(p.id, opt)}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                                          valorAtual === opt
+                                            ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-semibold ring-1 ring-emerald-400'
+                                            : 'bg-slate-50/50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                                        }`}
+                                      >
+                                        <input type="radio" checked={valorAtual === opt} onChange={() => {}} className="text-emerald-600" />
+                                        <span>{opt}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {p.tipo === 'texto' && (
+                                  <div>
+                                    <textarea
+                                      rows={isObs ? 4 : 3}
+                                      value={isObs ? (observacoesAdicionais || (valorAtual || '')) : (valorAtual || '')}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        handleSetValor(p.id, val);
+                                        if (isObs) setObservacoesAdicionais(val);
+                                      }}
+                                      placeholder={
+                                        isObs
+                                          ? "Escreva aqui suas observações adicionais... O texto é salvo automaticamente com debounce no seu navegador."
+                                          : "Escreva suas anotações pedagógicas ou pontos de atenção..."
+                                      }
+                                      className="w-full text-xs px-3.5 py-2.5 bg-slate-50/50 border border-slate-300 rounded-lg focus:outline-hidden focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 leading-relaxed"
+                                    />
+
+                                    {/* Auto-Save Indicator for Observações Adicionais */}
+                                    {isObs && (
+                                      <div className="flex flex-wrap items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100 text-xs">
+                                        <div className="flex items-center gap-1.5">
+                                          {autoSaveStatus === 'saving' && (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full animate-pulse">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                                              Salvando rascunho automaticamente...
+                                            </span>
+                                          )}
+                                          {autoSaveStatus === 'saved' && (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">
+                                              <Icons.CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                              Salvo localmente {lastSavedTime ? `às ${lastSavedTime}` : ''}
+                                            </span>
+                                          )}
+                                          {autoSaveStatus === 'idle' && (
+                                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                                              <Icons.Save className="w-3.5 h-3.5 text-slate-400" />
+                                              Salvamento automático debounced ativo
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="text-[11px] text-slate-400 font-mono">
+                                          {(observacoesAdicionais || (valorAtual || '')).length} caracteres
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Submit Button */}
+                        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <span className="text-xs text-slate-500">
+                            {respondidasCount === activePerguntas.length ? (
+                              <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                                <Icons.Check className="w-3.5 h-3.5" /> Todas as perguntas respondidas!
+                              </span>
+                            ) : (
+                              <span>Faltam {activePerguntas.length - respondidasCount} pergunta(s) para completar.</span>
+                            )}
+                          </span>
+
+                          <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <Icons.Send className="w-3.5 h-3.5" />
+                            <span>{isSubmitting ? 'Salvando...' : 'Gravar Respostas no Navegador'}</span>
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: DESEMPENHO DA TURMA COM GRÁFICO RADAR/BARRAS */}
+              {teacherTab === 'desempenho' && (
+                <div className="space-y-6 animate-fade-in">
+                  {/* Turma Selector */}
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <Icons.BarChart3 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Desempenho e Indicadores da Turma</h3>
+                        <p className="text-xs text-slate-500">Métricas consolidadas a partir das avaliações respondidas.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">Turma selecionada:</span>
+                      <select
+                        value={selectedTurmaDesempenho}
+                        onChange={(e) => setSelectedTurmaDesempenho(e.target.value)}
+                        className="text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-slate-800"
+                      >
+                        {turmas.map((t) => (
+                          <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Score Cards */}
+                  {(() => {
+                    const m = getTurmaMetrics(selectedTurmaDesempenho);
+                    const dadosCat = calcularMediasCategorias(selectedTurmaDesempenho);
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Geral</span>
+                            <div className="mt-2">
+                              <span className={`text-xs font-extrabold px-3 py-1 rounded-full border ${m.corStatus}`}>
+                                {m.status}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">{m.totalAvaliacoes} avaliações registradas</p>
+                          </div>
+
+                          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Média de Avaliação</span>
+                            <div className="text-2xl font-extrabold text-slate-900 mt-1 flex items-center gap-1 font-mono">
+                              <Icons.Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                              {m.mediaNota.toFixed(1)} / 5.0
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Escala consolidada</p>
+                          </div>
+
+                          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ocorrências</span>
+                            <div className={`text-2xl font-extrabold mt-1 font-mono ${m.ocorrenciasCount > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                              {m.ocorrenciasCount}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">{m.ocorrenciasCount > 0 ? 'Requer mediação' : 'Nenhuma ocorrência grave'}</p>
+                          </div>
+
+                          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Engajamento</span>
+                            <div className="text-2xl font-extrabold text-emerald-700 mt-1 font-mono">
+                              {dadosCat[0] ? dadosCat[0].media.toFixed(1) : '4.5'} / 5.0
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Foco e atenção dos alunos</p>
+                          </div>
+                        </div>
+
+                        {/* RADAR & BAR CHARTS SECTION */}
+                        <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Icons.Activity className="w-5 h-5 text-emerald-600" />
+                                <h4 className="text-base font-bold text-slate-900">
+                                  Média por Categoria de Pergunta
+                                </h4>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Visualização gráfica do desempenho médio da turma dividido por categorias de avaliação.
+                              </p>
+                            </div>
+
+                            {/* Chart Toggle */}
+                            <div className="flex items-center bg-slate-100 p-1 rounded-xl self-start sm:self-auto border border-slate-200">
+                              <button
+                                type="button"
+                                onClick={() => setTipoGrafico('radar')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                  tipoGrafico === 'radar' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                <Icons.Layers className="w-3.5 h-3.5" />
+                                <span>Radar (360°)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTipoGrafico('barras')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                  tipoGrafico === 'barras' ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                <Icons.BarChart3 className="w-3.5 h-3.5" />
+                                <span>Barras</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                            {/* Graphic Canvas */}
+                            <div className="lg:col-span-7 bg-slate-50/60 rounded-xl p-4 border border-slate-100 flex flex-col items-center justify-center min-h-[300px]">
+                              <CategoryCharts
+                                dadosCategorias={dadosCat}
+                                tipoGrafico={tipoGrafico}
+                                setTipoGrafico={setTipoGrafico}
+                              />
+                              <span className="text-[11px] text-slate-400 mt-2">
+                                Escala normalizada de 1.0 (crítico) a 5.0 (excelente)
+                              </span>
+                            </div>
+
+                            {/* Category Breakdown Cards */}
+                            <div className="lg:col-span-5 space-y-3">
+                              <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                Detalhamento por Categoria:
+                              </h5>
+                              {dadosCat.map((item) => {
+                                const percent = Math.min(100, Math.round((item.media / 5) * 100));
+                                let badge = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                                let statusTxt = 'Excelente';
+                                if (item.media < 2.5) { badge = 'text-rose-700 bg-rose-50 border-rose-200'; statusTxt = 'Atenção'; }
+                                else if (item.media < 3.5) { badge = 'text-amber-700 bg-amber-50 border-amber-200'; statusTxt = 'Regular'; }
+                                else if (item.media < 4.4) { badge = 'text-sky-700 bg-sky-50 border-sky-200'; statusTxt = 'Bom'; }
+
+                                return (
+                                  <div key={item.key} className="p-3.5 rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.cor }} />
+                                        <span className="font-bold text-xs text-slate-900">{item.categoria}</span>
+                                      </div>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge}`}>
+                                        {statusTxt}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 mb-2 line-clamp-1">{item.descricao}</p>
+                                    <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                                      <span className="text-slate-500 text-[11px]">{item.totalRespostas} avaliações</span>
+                                      <span className="font-mono font-bold text-slate-900 flex items-center gap-1">
+                                        <Icons.Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                        {item.media.toFixed(1)} / 5.0
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: item.cor }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* TAB 3: PANORAMA GERAL DAS TURMAS */}
+              {teacherTab === 'panorama' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Panorama Geral de Todas as Turmas</h3>
+                      <p className="text-xs text-slate-500">Comparativo das turmas cadastradas na instituição.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {turmas.map((t) => {
+                      const m = getTurmaMetrics(t.id);
+                      return (
+                        <div key={t.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-sm text-slate-900">{t.nome}</span>
+                            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                              {t.turno}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between">
+                            <div>
+                              <span className="text-[11px] text-slate-500 block">Média Geral</span>
+                              <span className="text-lg font-bold text-slate-900 font-mono">
+                                {m.mediaNota.toFixed(1)} / 5.0
+                              </span>
+                            </div>
+                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${m.corStatus}`}>
+                              {m.status}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </main>
+          )}
+
+          {/* ============================================================== */}
+          {/* ROLE: DIRETOR DASHBOARD & GESTÃO COMPLETA                      */}
+          {/* ============================================================== */}
+          {role === 'diretor' && (
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full flex-1 space-y-6">
+              {/* Director Header */}
+              <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-[11px] font-semibold text-indigo-200 mb-2">
+                    <Icons.Award className="w-3.5 h-3.5" />
+                    Painel da Direção Escolar
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
+                    Coordenação & Gestão Pedagógica
+                  </h2>
+                  <p className="text-xs sm:text-sm text-indigo-200 mt-1">
+                    Cadastre salas, turmas e perguntas do questionário, e acompanhe todos os envios.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportCSV}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Icons.FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Exportar CSV</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Restaurar dados de exemplo do sistema?')) {
+                        StorageService.resetAll();
+                        setSalas(StorageService.getSalas());
+                        setTurmas(StorageService.getTurmas());
+                        setPerguntas(StorageService.getPerguntas());
+                        setRespostas(StorageService.getRespostas());
+                      }
+                    }}
+                    className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Icons.RotateCcw className="w-3.5 h-3.5" />
+                    <span>Resetar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Director Tabs */}
+              <div className="flex items-center gap-2 border-b border-slate-200 overflow-x-auto">
+                {[
+                  { id: 'dashboard', label: 'Dashboard & Métricas', icon: Icons.BarChart3 },
+                  { id: 'perguntas', label: `Perguntas (${perguntas.length})`, icon: Icons.ClipboardList },
+                  { id: 'turmas', label: `Turmas (${turmas.length})`, icon: Icons.Users },
+                  { id: 'salas', label: `Salas (${salas.length})`, icon: Icons.Building },
+                  { id: 'respostas', label: `Envios Recebidos (${respostas.length})`, icon: Icons.MessageSquare },
+                ].map((t) => {
+                  const IconComp = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setDirectorTab(t.id)}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                        directorTab === t.id
+                          ? 'border-indigo-600 text-indigo-700'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <IconComp className="w-4 h-4" />
+                      <span>{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* TAB: DASHBOARD */}
+              {directorTab === 'dashboard' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Salas Físicas</span>
+                      <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">{salas.length}</div>
+                      <p className="text-xs text-slate-500 mt-1">Cadastradas no sistema</p>
+                    </div>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Turmas</span>
+                      <div className="text-2xl font-extrabold text-slate-900 mt-1 font-mono">{turmas.length}</div>
+                      <p className="text-xs text-slate-500 mt-1">Em atividade</p>
+                    </div>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Perguntas Ativas</span>
+                      <div className="text-2xl font-extrabold text-emerald-700 mt-1 font-mono">{activePerguntas.length}</div>
+                      <p className="text-xs text-slate-500 mt-1">No questionário do professor</p>
+                    </div>
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Envios Computados</span>
+                      <div className="text-2xl font-extrabold text-indigo-700 mt-1 font-mono">{respostas.length}</div>
+                      <p className="text-xs text-slate-500 mt-1">Respostas gravadas</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: PERGUNTAS */}
+              {directorTab === 'perguntas' && (
+                <div className="space-y-6">
+                  {/* Form Adicionar Pergunta */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+                    <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                      <Icons.Plus className="w-4 h-4 text-indigo-600" />
+                      <span>Cadastrar Nova Pergunta no Questionário</span>
+                    </h3>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!novaPerguntaEnunciado.trim()) return;
+                        const nova = {
+                          id: 'p-' + Date.now(),
+                          enunciado: novaPerguntaEnunciado.trim(),
+                          categoria: novaPerguntaCategoria,
+                          tipo: novaPerguntaTipo,
+                          obrigatoria: novaPerguntaObrigatoria,
+                          ativa: true,
+                          ordem: perguntas.length + 1,
+                        };
+                        const updated = [...perguntas, nova];
+                        setPerguntas(updated);
+                        StorageService.setPerguntas(updated);
+                        setNovaPerguntaEnunciado('');
+                      }}
+                      className="space-y-3"
+                    >
+                      <div>
+                        <input
+                          type="text"
+                          required
+                          value={novaPerguntaEnunciado}
+                          onChange={(e) => setNovaPerguntaEnunciado(e.target.value)}
+                          placeholder="Digite o enunciado da pergunta (ex: Como está a ventilação e iluminação da sala?)"
+                          className="w-full text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 rounded-lg"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <select
+                          value={novaPerguntaCategoria}
+                          onChange={(e) => setNovaPerguntaCategoria(e.target.value)}
+                          className="text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                        >
+                          <option value="turma">Categoria: Turma / Alunos</option>
+                          <option value="sala">Categoria: Sala / Infraestrutura</option>
+                          <option value="geral">Categoria: Geral / Coordenação</option>
+                        </select>
+                        <select
+                          value={novaPerguntaTipo}
+                          onChange={(e) => setNovaPerguntaTipo(e.target.value)}
+                          className="text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                        >
+                          <option value="escala">Tipo: Escala (Caixas Ótimo a Ruim)</option>
+                          <option value="sim_nao">Tipo: Sim / Não</option>
+                          <option value="texto">Tipo: Texto Livre</option>
+                        </select>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          + Adicionar Pergunta
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Lista de Perguntas */}
+                  <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-xs">
+                    {perguntas.map((p, i) => (
+                      <div key={p.id} className="p-4 flex items-center justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <span className="font-mono text-xs font-bold text-slate-400 mt-0.5">#{i + 1}</span>
+                          <div>
+                            <p className="text-xs sm:text-sm font-bold text-slate-900">{p.enunciado}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">
+                                {p.categoria}
+                              </span>
+                              <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                {p.tipo}
+                              </span>
+                              {p.obrigatoria && (
+                                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                                  Obrigatória
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            if (confirm('Deseja excluir esta pergunta?')) {
+                              const updated = perguntas.filter((item) => item.id !== p.id);
+                              setPerguntas(updated);
+                              StorageService.setPerguntas(updated);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <Icons.Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: TURMAS */}
+              {directorTab === 'turmas' && (
+                <div className="space-y-6">
+                  {/* Form Adicionar Turma */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+                    <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                      <Icons.Plus className="w-4 h-4 text-indigo-600" />
+                      <span>Cadastrar Nova Turma</span>
+                    </h3>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!novaTurmaNome.trim()) return;
+                        const nova = {
+                          id: 'turma-' + Date.now(),
+                          nome: novaTurmaNome.trim(),
+                          turno: novaTurmaTurno,
+                        };
+                        const updated = [...turmas, nova];
+                        setTurmas(updated);
+                        StorageService.setTurmas(updated);
+                        setNovaTurmaNome('');
+                      }}
+                      className="flex flex-col sm:flex-row gap-3"
+                    >
+                      <input
+                        type="text"
+                        required
+                        value={novaTurmaNome}
+                        onChange={(e) => setNovaTurmaNome(e.target.value)}
+                        placeholder="Nome da Turma (ex: 2º Ano C)"
+                        className="flex-1 text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 rounded-lg"
+                      />
+                      <select
+                        value={novaTurmaTurno}
+                        onChange={(e) => setNovaTurmaTurno(e.target.value)}
+                        className="text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                      >
+                        <option value="Manhã">Turno: Manhã</option>
+                        <option value="Tarde">Turno: Tarde</option>
+                        <option value="Noite">Turno: Noite</option>
+                        <option value="Integral">Turno: Integral</option>
+                      </select>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        + Adicionar
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Grid de Turmas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {turmas.map((t) => (
+                      <div key={t.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-sm text-slate-900">{t.nome}</p>
+                          <p className="text-xs text-slate-500">Turno: {t.turno}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Excluir turma "${t.nome}"?`)) {
+                              const updated = turmas.filter((item) => item.id !== t.id);
+                              setTurmas(updated);
+                              StorageService.setTurmas(updated);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer"
+                        >
+                          <Icons.Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: SALAS */}
+              {directorTab === 'salas' && (
+                <div className="space-y-6">
+                  <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+                    <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                      <Icons.Plus className="w-4 h-4 text-indigo-600" />
+                      <span>Cadastrar Nova Sala de Aula</span>
+                    </h3>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!novaSalaNome.trim()) return;
+                        const nova = {
+                          id: 'sala-' + Date.now(),
+                          nome: novaSalaNome.trim(),
+                          bloco: novaSalaBloco.trim() || 'Bloco Geral',
+                          capacidade: Number(novaSalaCapacidade) || 35,
+                        };
+                        const updated = [...salas, nova];
+                        setSalas(updated);
+                        StorageService.setSalas(updated);
+                        setNovaSalaNome('');
+                        setNovaSalaBloco('');
+                      }}
+                      className="grid grid-cols-1 sm:grid-cols-4 gap-3"
+                    >
+                      <input
+                        type="text"
+                        required
+                        value={novaSalaNome}
+                        onChange={(e) => setNovaSalaNome(e.target.value)}
+                        placeholder="Nome (ex: Sala 301)"
+                        className="text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 rounded-lg sm:col-span-2"
+                      />
+                      <input
+                        type="text"
+                        value={novaSalaBloco}
+                        onChange={(e) => setNovaSalaBloco(e.target.value)}
+                        placeholder="Bloco / Andar"
+                        className="text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 rounded-lg"
+                      />
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        + Adicionar
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {salas.map((s) => (
+                      <div key={s.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-sm text-slate-900">{s.nome}</p>
+                          <p className="text-xs text-slate-500">{s.bloco} &bull; {s.capacidade} alunos</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Excluir sala "${s.nome}"?`)) {
+                              const updated = salas.filter((item) => item.id !== s.id);
+                              setSalas(updated);
+                              StorageService.setSalas(updated);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer"
+                        >
+                          <Icons.Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: RESPOSTAS RECEBIDAS */}
+              {directorTab === 'respostas' && (
+                <div className="space-y-4">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="w-full sm:w-64">
+                      <select
+                        value={filtroTurmaDirector}
+                        onChange={(e) => setFiltroTurmaDirector(e.target.value)}
+                        className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                      >
+                        <option value="todos">Todas as Turmas ({turmas.length})</option>
+                        {turmas.map((t) => (
+                          <option key={t.id} value={t.id}>{t.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="w-full sm:w-72">
+                      <input
+                        type="text"
+                        value={filtroBuscaDirector}
+                        onChange={(e) => setFiltroBuscaDirector(e.target.value)}
+                        placeholder="Buscar por professor ou turma..."
+                        className="w-full text-xs px-3.5 py-2 border border-slate-300 rounded-lg"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-xs">
+                    {filteredRespostasDirector.length === 0 ? (
+                      <div className="p-12 text-center text-slate-400">
+                        Nenhuma resposta encontrada para os filtros atuais.
+                      </div>
+                    ) : (
+                      filteredRespostasDirector.map((r) => {
+                        const isExpanded = expandedRespostaId === r.id;
+                        const dataStr = new Date(r.timestamp).toLocaleString('pt-BR');
+
+                        return (
+                          <div key={r.id} className="p-4 hover:bg-slate-50/60 transition-colors">
+                            <div
+                              onClick={() => setExpandedRespostaId(isExpanded ? null : r.id)}
+                              className="flex items-start justify-between gap-4 cursor-pointer"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                  <span className="font-bold text-sm text-slate-900">{r.professorNome}</span>
+                                  <span className="text-slate-300">&bull;</span>
+                                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                    Turma: {r.turmaNome}
+                                  </span>
+                                  <span className="text-xs text-slate-600">Sala: {r.salaNome}</span>
+                                </div>
+                                <div className="text-xs text-slate-400 flex items-center gap-2">
+                                  <Icons.Calendar className="w-3.5 h-3.5" />
+                                  <span>{dataStr}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold">
+                                <span>{isExpanded ? 'Recolher' : 'Ver Detalhes'}</span>
+                                {isExpanded ? <Icons.ChevronUp className="w-4 h-4" /> : <Icons.ChevronDown className="w-4 h-4" />}
+                              </div>
+                            </div>
+
+                            {/* Detalhes Expandidos */}
+                            {isExpanded && (
+                              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2.5 animate-fade-in">
+                                {Object.entries(r.respostas).map(([pid, val]) => {
+                                  const pObj = perguntas.find((p) => p.id === pid);
+                                  return (
+                                    <div key={pid} className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80 text-xs">
+                                      <p className="font-semibold text-slate-600 mb-0.5">{pObj ? pObj.enunciado : pid}</p>
+                                      <p className="font-bold text-slate-900">{String(val)}</p>
+                                    </div>
+                                  );
+                                })}
+
+                                {r.observacoesGerais && (
+                                  <div className="bg-indigo-50/70 p-3 rounded-lg border border-indigo-200 text-xs mt-2">
+                                    <div className="font-bold text-indigo-900 mb-1 flex items-center gap-1.5">
+                                      <Icons.MessageSquare className="w-3.5 h-3.5 text-indigo-700" />
+                                      Observações Adicionais Registradas:
+                                    </div>
+                                    <p className="text-slate-800 whitespace-pre-wrap leading-relaxed">{r.observacoesGerais}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </main>
+          )}
+
+          {/* ============================================================== */}
+          {/* MODAL: MUDAR DE TURMA / SALA                                   */}
+          {/* ============================================================== */}
+          {showChangeModal && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <h3 className="font-extrabold text-slate-900 text-base">Mudar de Turma ou Sala</h3>
+                  <button onClick={() => setShowChangeModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <Icons.Check className="w-5 h-5 hidden" />
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Selecione a Turma:</label>
+                    <select
+                      value={selectedTurmaId}
+                      onChange={(e) => setSelectedTurmaId(e.target.value)}
+                      className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
+                    >
+                      {turmas.map((t) => (
+                        <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Selecione a Sala de Aula:</label>
+                    <select
+                      value={selectedSalaId}
+                      onChange={(e) => setSelectedSalaId(e.target.value)}
+                      className="w-full p-2.5 border border-slate-300 rounded-lg bg-white"
+                    >
+                      {salas.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nome} - {s.bloco}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setShowChangeModal(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedTurmaDesempenho(selectedTurmaId);
+                      setShowChangeModal(false);
+                    }}
+                    className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg cursor-pointer shadow-xs"
+                  >
+                    Confirmar Seleção
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
+            Gestão Escolar Autônoma &bull; Executando 100% no seu navegador &bull; Dados salvos no LocalStorage
+          </footer>
+        </div>
+      );
+    }
+
+    // Mount to Root
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 </body>
 </html>

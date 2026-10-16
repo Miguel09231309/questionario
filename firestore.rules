@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidSala(data) {
+      return data.keys().hasAll(['id', 'nome']) &&
+             data.keys().hasOnly(['id', 'nome', 'bloco', 'capacidade']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.nome is string && data.nome.size() > 0 && data.nome.size() <= 120 &&
+             (!('bloco' in data) || (data.bloco is string && data.bloco.size() <= 60)) &&
+             (!('capacidade' in data) || (data.capacidade is number && data.capacidade >= 0 && data.capacidade <= 200));
+    }
+
+    function isValidTurma(data) {
+      return data.keys().hasAll(['id', 'nome', 'turno']) &&
+             data.keys().hasOnly(['id', 'nome', 'turno']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.nome is string && data.nome.size() > 0 && data.nome.size() <= 120 &&
+             data.turno is string && (data.turno == 'Manhã' || data.turno == 'Tarde' || data.turno == 'Noite' || data.turno == 'Integral');
+    }
+
+    function isValidPergunta(data) {
+      return data.keys().hasAll(['id', 'enunciado', 'categoria', 'tipo', 'obrigatoria', 'ordem']) &&
+             data.keys().hasOnly(['id', 'enunciado', 'categoria', 'tipo', 'opcoes', 'obrigatoria', 'ativa', 'ordem', 'criadaEm']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.enunciado is string && data.enunciado.size() > 0 && data.enunciado.size() <= 500 &&
+             data.categoria is string && (data.categoria == 'sala' || data.categoria == 'turma' || data.categoria == 'geral') &&
+             data.tipo is string && (data.tipo == 'escala' || data.tipo == 'multipla_escolha' || data.tipo == 'sim_nao' || data.tipo == 'texto') &&
+             data.obrigatoria is bool &&
+             data.ordem is number &&
+             (!('ativa' in data) || data.ativa is bool) &&
+             (!('opcoes' in data) || (data.opcoes is list && data.opcoes.size() <= 20)) &&
+             (!('criadaEm' in data) || (data.criadaEm is string && data.criadaEm.size() <= 100));
+    }
+
+    function isValidResposta(data) {
+      return data.keys().hasAll(['id', 'professorNome', 'salaId', 'turmaId', 'respostas', 'timestamp']) &&
+             data.keys().hasOnly(['id', 'professorNome', 'salaId', 'salaNome', 'turmaId', 'turmaNome', 'respostas', 'observacoesGerais', 'criadaEm', 'timestamp']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.professorNome is string && data.professorNome.size() > 0 && data.professorNome.size() <= 150 &&
+             data.salaId is string && data.salaId.size() > 0 && data.salaId.size() <= 100 &&
+             data.turmaId is string && data.turmaId.size() > 0 && data.turmaId.size() <= 100 &&
+             data.respostas is map &&
+             data.timestamp is number && data.timestamp > 0 &&
+             (!('salaNome' in data) || (data.salaNome is string && data.salaNome.size() <= 120)) &&
+             (!('turmaNome' in data) || (data.turmaNome is string && data.turmaNome.size() <= 120)) &&
+             (!('observacoesGerais' in data) || (data.observacoesGerais is string && data.observacoesGerais.size() <= 2000)) &&
+             (!('criadaEm' in data) || (data.criadaEm is string && data.criadaEm.size() <= 100));
+    }
+
+    match /salas/{salaId} {
+      allow read: if true;
+      allow create, update: if isValidId(salaId) && isValidSala(incoming());
+      allow delete: if isValidId(salaId);
+    }
+
+    match /turmas/{turmaId} {
+      allow read: if true;
+      allow create, update: if isValidId(turmaId) && isValidTurma(incoming());
+      allow delete: if isValidId(turmaId);
+    }
+
+    match /perguntas/{perguntaId} {
+      allow read: if true;
+      allow create, update: if isValidId(perguntaId) && isValidPergunta(incoming());
+      allow delete: if isValidId(perguntaId);
+    }
+
+    match /respostas/{respostaId} {
+      allow read: if true;
+      allow create, update: if isValidId(respostaId) && isValidResposta(incoming());
+      allow delete: if isValidId(respostaId);
+    }
+
+    match /test/connection {
+      allow read, write: if true;
+    }
+  }
+}

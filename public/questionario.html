@@ -1,1214 +1,2167 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema Escolar - Questionário de Salas & Turmas (IndexedDB)</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary: #4338ca;
-      --primary-hover: #3730a3;
-      --primary-light: #e0e7ff;
-      --bg: #f8fafc;
-      --surface: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --text-muted: #64748b;
-      --success: #16a34a;
-      --danger: #dc2626;
-      --warning: #d97706;
-      --radius: 10px;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestão Escolar - Questionário de Salas & Turmas</title>
+    <meta name="description" content="Sistema escolar autônomo para diretores cadastrarem perguntas sobre salas e turmas e professores responderem, com persistência local em IndexedDB." />
+    <meta property="og:title" content="Gestão Escolar - Questionário de Salas & Turmas" />
+    <meta property="og:description" content="Sistema escolar autônomo para diretores cadastrarem perguntas sobre salas e turmas e professores responderem, com persistência local em IndexedDB." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    }
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            colors: {
+              brand: {
+                50: '#eef2ff',
+                100: '#e0e7ff',
+                500: '#6366f1',
+                600: '#4f46e5',
+                700: '#4338ca',
+                800: '#3730a3',
+                900: '#312e81',
+              }
+            }
+          }
+        }
+      }
+    </script>
 
-    header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 1.5rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
+    <!-- React 18 & Babel Standalone via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.10/babel.min.js"></script>
 
-    .brand {
-      font-weight: 800;
-      font-size: 1.25rem;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .user-badge {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-size: 0.875rem;
-      color: var(--text-muted);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid transparent;
-      transition: all 0.15s ease;
-      white-space: nowrap;
-    }
-
-    .btn-primary {
-      background: var(--primary);
-      color: #fff;
-    }
-    .btn-primary:hover {
-      background: var(--primary-hover);
-    }
-
-    .btn-secondary {
-      background: #f1f5f9;
-      color: var(--text);
-      border-color: var(--border);
-    }
-    .btn-secondary:hover {
-      background: #e2e8f0;
-    }
-
-    .btn-danger {
-      background: #fef2f2;
-      color: var(--danger);
-      border-color: #fecaca;
-    }
-    .btn-danger:hover {
-      background: #fee2e2;
-    }
-
-    .btn-success {
-      background: #f0fdf4;
-      color: var(--success);
-      border-color: #bbf7d0;
-    }
-
-    .container {
-      max-width: 1050px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-      flex: 1;
-      width: 100%;
-    }
-
-    /* Tabs */
-    .tab-bar {
-      display: flex;
-      gap: 0.5rem;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 1.5rem;
-    }
-
-    .tab-btn {
-      padding: 0.75rem 1.25rem;
-      font-weight: 600;
-      font-size: 0.925rem;
-      background: none;
-      border: none;
-      border-bottom: 2px solid transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    .tab-btn.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
-    }
-
-    /* Cards */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-    }
-
-    .card-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-
-    .card-subtitle {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      margin-bottom: 1.25rem;
-    }
-
-    /* Form Inputs */
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
-
-    label {
-      display: block;
-      font-size: 0.875rem;
-      font-weight: 600;
-      margin-bottom: 0.35rem;
-      color: #334155;
-    }
-
-    input[type="text"], input[type="password"], select, textarea {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.95rem;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(67, 56, 202, 0.12);
-    }
-
-    /* Login Selector */
-    .role-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1.5rem;
-      margin-top: 1rem;
-    }
-
-    .role-card {
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      padding: 1.75rem;
-      background: var(--surface);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: left;
-    }
-
-    .role-card:hover {
-      border-color: var(--primary);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(67, 56, 202, 0.08);
-    }
-
-    .role-card.selected {
-      border-color: var(--primary);
-      background: #faf5ff;
-    }
-
-    .role-badge {
-      display: inline-block;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--primary);
-      margin-bottom: 0.5rem;
-    }
-
-    /* Question items in Director list */
-    .question-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 1rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .question-row:last-child {
-      border-bottom: none;
-    }
-
-    .question-meta {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-    }
-
-    /* Question items for Teacher */
-    .question-box {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1.25rem;
-      margin-bottom: 1.25rem;
-      background: #fff;
-    }
-
-    .question-box.answered {
-      border-left: 4px solid var(--success);
-    }
-
-    .rating-buttons {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-
-    .rating-btn {
-      width: 44px;
-      height: 44px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #f8fafc;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-    }
-
-    .rating-btn:hover {
-      background: var(--primary-light);
-      border-color: var(--primary);
-    }
-
-    .rating-btn.active {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-
-    .options-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-
-    .radio-option {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      cursor: pointer;
-      background: #f8fafc;
-    }
-
-    .radio-option:hover {
-      background: #f1f5f9;
-    }
-
-    .radio-option input {
-      cursor: pointer;
-    }
-
-    .tabular {
-      font-variant-numeric: tabular-nums;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* Notification Banner */
-    .toast {
-      position: fixed;
-      bottom: 1.5rem;
-      right: 1.5rem;
-      background: #1e293b;
-      color: #fff;
-      padding: 0.85rem 1.25rem;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-      font-size: 0.9rem;
-      display: none;
-      z-index: 100;
-    }
-
-    footer {
-      text-align: center;
-      padding: 1.5rem;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      border-top: 1px solid var(--border);
-      background: var(--surface);
-      margin-top: auto;
-    }
-  </style>
-</head>
-<body>
-
-  <header>
-    <div class="brand">
-      🏫 Gestão Escolar &bull; Questionários
-    </div>
-    <div class="user-badge" id="headerUserArea">
-      <span>Não autenticado</span>
-    </div>
-  </header>
-
-  <div class="container">
-    <!-- VIEW 1: LOGIN -->
-    <div id="viewLogin">
-      <div class="card" style="text-align: center; padding: 2.5rem 1.5rem;">
-        <h1 style="font-size: 1.75rem; margin-bottom: 0.5rem;">Acesso ao Portal Escolar</h1>
-        <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem;">
-          Selecione seu perfil abaixo para continuar. O diretor cadastra perguntas e analisa relatórios; o professor responde o questionário por turma e sala.
-        </p>
-
-        <div class="role-grid">
-          <div class="role-card" onclick="selectRole('diretor')">
-            <span class="role-badge">Acesso Administrativo</span>
-            <h3 style="margin-bottom: 0.35rem;">Diretor(a) Escolar</h3>
-            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Cadastre, edite ou exclua perguntas sobre as salas e turmas. Veja respostas consolidadas e métricas.
-            </p>
-            <div id="diretorForm" style="display: none; margin-top: 1rem; text-align: left;" onclick="event.stopPropagation()">
-              <div class="form-group">
-                <label>Senha de Acesso (padrão: <code>admin123</code>)</label>
-                <input type="password" id="diretorSenha" value="admin123" placeholder="Digite sua senha">
-              </div>
-              <button class="btn btn-primary" style="width: 100%;" onclick="loginDiretor()">Entrar como Diretor</button>
-            </div>
+    <style>
+      body {
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      }
+      .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased selection:bg-indigo-100 selection:text-indigo-900 min-h-screen">
+    
+    <!-- Elemento raiz com tela de carregamento amigável (garante que NUNCA fica branca) -->
+    <div id="root">
+      <div class="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-700">
+        <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+        <h2 class="text-lg font-bold text-slate-900 tracking-tight">Colégio Saber Ativo</h2>
+        <p class="text-sm text-slate-500 mt-1">Carregando questionário de salas e turmas...</p>
+        <noscript>
+          <div class="mt-4 p-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg max-w-md text-center">
+            Este aplicativo necessita de JavaScript ativado em seu navegador para funcionar com o banco de dados IndexedDB.
           </div>
-
-          <div class="role-card" onclick="selectRole('professor')">
-            <span class="role-badge" style="color: var(--success);">Corpo Docente</span>
-            <h3 style="margin-bottom: 0.35rem;">Professor(a)</h3>
-            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Informe seu nome, a sala e a turma em que lecionou para responder o questionário do dia.
-            </p>
-            <div id="professorForm" style="display: none; margin-top: 1rem; text-align: left;" onclick="event.stopPropagation()">
-              <div class="form-group">
-                <label>Seu Nome / Disciplina</label>
-                <input type="text" id="profNome" placeholder="Ex: Profª Helena Silva (Português)">
-              </div>
-              <div class="form-group">
-                <label>Sala de Aula</label>
-                <select id="profSalaSelect"></select>
-              </div>
-              <div class="form-group">
-                <label>Turma</label>
-                <select id="profTurmaSelect"></select>
-              </div>
-              <button class="btn btn-primary" style="width: 100%;" onclick="loginProfessor()">Iniciar Questionário</button>
-            </div>
-          </div>
-        </div>
+        </noscript>
       </div>
     </div>
 
-    <!-- VIEW 2: DIRETOR -->
-    <div id="viewDiretor" style="display: none;">
-      <div class="tab-bar">
-        <button class="tab-btn active" id="tabBtnPerguntas" onclick="switchDiretorTab('perguntas')">Gerenciar Perguntas</button>
-        <button class="tab-btn" id="tabBtnRespostas" onclick="switchDiretorTab('respostas')">Respostas & Relatórios</button>
-        <button class="tab-btn" id="tabBtnSalasTurmas" onclick="switchDiretorTab('salasturmas')">Salas & Turmas</button>
-      </div>
+    <!-- Script React Autônomo com IndexedDB Integrado -->
+    <script type="text/babel">
+      const { useState, useEffect, useMemo, useRef } = React;
 
-      <!-- TAB: PERGUNTAS -->
-      <div id="diretorTabPerguntas">
-        <div class="card">
-          <h2 class="card-title">Nova Pergunta</h2>
-          <p class="card-subtitle">Cadastre perguntas que os professores deverão responder após as aulas.</p>
+      // ==========================================
+      // BANCO DE DADOS INDEXEDDB + LOCALSTORAGE FALLBACK
+      // ==========================================
+      const DB_NAME = 'EscolaQuestionarioDB';
+      const DB_VERSION = 1;
 
-          <form id="formNovaPergunta" onsubmit="salvarNovaPergunta(event)">
-            <div class="form-group">
-              <label>Enunciado da Pergunta *</label>
-              <input type="text" id="perguntaEnunciado" required placeholder="Ex: O ar-condicionado e a lousa estavam funcionando adequadamente?">
-            </div>
+      const INITIAL_SALAS = [
+        { id: 'sala-101', nome: 'Sala 101 (Bloco A)', bloco: 'Bloco A', capacidade: 35 },
+        { id: 'sala-102', nome: 'Sala 102 (Bloco A)', bloco: 'Bloco A', capacidade: 35 },
+        { id: 'sala-lab', nome: 'Laboratório de Ciências', bloco: 'Bloco B', capacidade: 30 },
+        { id: 'sala-info', nome: 'Laboratório de Informática', bloco: 'Bloco B', capacidade: 32 },
+        { id: 'sala-204', nome: 'Sala 204 (Multimídia)', bloco: 'Bloco C', capacidade: 40 },
+        { id: 'sala-artes', nome: 'Ateliê de Artes', bloco: 'Bloco Cultural', capacidade: 28 },
+      ];
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-              <div class="form-group">
-                <label>Foco / Categoria</label>
-                <select id="perguntaCategoria">
-                  <option value="sala">Estrutura da Sala de Aula</option>
-                  <option value="turma">Desempenho / Conduta da Turma</option>
-                  <option value="geral">Geral / Observações</option>
-                </select>
-              </div>
+      const INITIAL_TURMAS = [
+        { id: 'turma-6a', nome: '6º Ano A', turno: 'Manhã' },
+        { id: 'turma-7b', nome: '7º Ano B', turno: 'Manhã' },
+        { id: 'turma-8a', nome: '8º Ano A', turno: 'Tarde' },
+        { id: 'turma-9c', nome: '9º Ano C', turno: 'Tarde' },
+        { id: 'turma-1em', nome: '1º Ano Ensino Médio', turno: 'Manhã' },
+        { id: 'turma-3em', nome: '3º Ano Ensino Médio', turno: 'Manhã' },
+      ];
 
-              <div class="form-group">
-                <label>Tipo de Resposta</label>
-                <select id="perguntaTipo" onchange="toggleOpcoesMultipla()">
-                  <option value="escala">Escala 1 a 5 (Estrelas / Avaliação)</option>
-                  <option value="sim_nao">Sim / Não</option>
-                  <option value="multipla_escolha">Múltipla Escolha</option>
-                  <option value="texto">Texto Dissertativo</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label>Obrigatória?</label>
-                <select id="perguntaObrigatoria">
-                  <option value="true">Sim, obrigatória</option>
-                  <option value="false">Opcional</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="form-group" id="grupoOpcoesMultipla" style="display: none;">
-              <label>Opções de Múltipla Escolha (uma por linha)</label>
-              <textarea id="perguntaOpcoes" rows="3" placeholder="Excelente&#10;Bom&#10;Regular&#10;Ruim"></textarea>
-            </div>
-
-            <div style="text-align: right;">
-              <button type="submit" class="btn btn-primary">+ Salvar Pergunta</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <div>
-              <h2 class="card-title">Perguntas Cadastradas</h2>
-              <p class="card-subtitle" style="margin-bottom: 0;">Lista atualizada no IndexedDB. O diretor pode excluir perguntas antigas ou desativar.</p>
-            </div>
-            <span class="tabular" id="totalPerguntasBadge" style="font-size: 0.875rem; color: var(--text-muted);">0 perguntas</span>
-          </div>
-
-          <div id="listaPerguntasContainer">
-            <!-- preenchido via script -->
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB: RESPOSTAS -->
-      <div id="diretorTabRespostas" style="display: none;">
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
-            <div>
-              <h2 class="card-title">Respostas dos Professores</h2>
-              <p class="card-subtitle" style="margin-bottom: 0;">Visualização completa com dados salvos no IndexedDB.</p>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-              <button class="btn btn-secondary" onclick="exportarCSV()">Exportar CSV</button>
-              <button class="btn btn-secondary" onclick="exportarJSON()">Backup JSON</button>
-            </div>
-          </div>
-
-          <div id="respostasContainer">
-            <!-- preenchido via script -->
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB: SALAS & TURMAS -->
-      <div id="diretorTabSalasTurmas" style="display: none;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
-          <div class="card">
-            <h2 class="card-title">Salas Cadastradas</h2>
-            <p class="card-subtitle">Espaços físicos avaliados pelos professores.</p>
-            <form onsubmit="adicionarSala(event)" style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-              <input type="text" id="novaSalaNome" placeholder="Ex: Laboratório Maker" required>
-              <button type="submit" class="btn btn-primary">+</button>
-            </form>
-            <ul id="listaSalasConfig" style="list-style: none;"></ul>
-          </div>
-
-          <div class="card">
-            <h2 class="card-title">Turmas Cadastradas</h2>
-            <p class="card-subtitle">Séries e classes que utilizam os espaços escolares.</p>
-            <form onsubmit="adicionarTurma(event)" style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-              <input type="text" id="novaTurmaNome" placeholder="Ex: 2º Ano Médio B" required>
-              <button type="submit" class="btn btn-primary">+</button>
-            </form>
-            <ul id="listaTurmasConfig" style="list-style: none;"></ul>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- VIEW 3: PROFESSOR -->
-    <div id="viewProfessor" style="display: none;">
-      <div class="card" style="background: linear-gradient(135deg, #eef2ff, #f8fafc); border-color: #c7d2fe;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
-          <div>
-            <h2 style="font-size: 1.25rem; font-weight: 700; color: #1e1b4b;" id="profCabecalhoNome">Professor</h2>
-            <p style="font-size: 0.875rem; color: #4338ca;" id="profCabecalhoDetalhes">Sala: - &bull; Turma: -</p>
-          </div>
-          <button class="btn btn-secondary" onclick="trocarSalaTurma()">Trocar Sala / Turma</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2 class="card-title">Questionário de Avaliação da Aula</h2>
-        <p class="card-subtitle">Por favor, responda com sinceridade às perguntas cadastradas pela direção escolar.</p>
-
-        <form id="formQuestionarioProfessor" onsubmit="enviarRespostasProfessor(event)">
-          <div id="questionarioContainer">
-            <!-- preenchido via script -->
-          </div>
-
-          <div style="margin-top: 1.5rem; text-align: right;">
-            <button type="submit" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem;">
-              &check; Gravar Respostas no Banco de Dados
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast" id="toastMessage"></div>
-
-  <footer>
-    Sistema de Gestão Escolar &bull; Banco de Dados IndexedDB integrado &bull; Versão Autônoma HTML
-  </footer>
-
-  <script>
-    // ==========================================
-    // BANCO DE DADOS INDEXEDDB
-    // ==========================================
-    const DB_NAME = 'EscolaQuestionarioDB';
-    const DB_VERSION = 1;
-    let db;
-
-    const DADOS_INICIAIS = {
-      salas: [
-        { id: 'sala-1', nome: 'Sala 101 - Bloco A' },
-        { id: 'sala-2', nome: 'Sala 102 - Bloco A' },
-        { id: 'sala-3', nome: 'Laboratório de Ciências' },
-        { id: 'sala-4', nome: 'Sala de Informática' },
-        { id: 'sala-5', nome: 'Sala 204 - Multimídia' }
-      ],
-      turmas: [
-        { id: 'turma-1', nome: '6º Ano A' },
-        { id: 'turma-2', nome: '7º Ano B' },
-        { id: 'turma-3', nome: '8º Ano A' },
-        { id: 'turma-4', nome: '9º Ano C' },
-        { id: 'turma-5', nome: '1º Ano Médio' }
-      ],
-      perguntas: [
+      const INITIAL_PERGUNTAS = [
         {
           id: 'p-1',
           enunciado: 'Como você avalia as condições físicas da sala (iluminação, ventilação e ar-condicionado)?',
           categoria: 'sala',
           tipo: 'escala',
-          obrigatoria: true
+          obrigatoria: true,
+          ativa: true,
+          ordem: 1,
+          criadaEm: '2026-09-20T10:00:00.000Z',
         },
         {
           id: 'p-2',
-          enunciado: 'Os equipamentos multimídia (projetor, TV, caixas de som) estavam funcionando perfeitamente?',
+          enunciado: 'Os equipamentos multimídia (projetor, TV, caixas de som e tomadas) estavam em pleno funcionamento?',
           categoria: 'sala',
           tipo: 'sim_nao',
-          obrigatoria: true
+          obrigatoria: true,
+          ativa: true,
+          ordem: 2,
+          criadaEm: '2026-09-20T10:05:00.000Z',
         },
         {
           id: 'p-3',
-          enunciado: 'Qual é o estado de conservação das carteiras e cadeiras?',
+          enunciado: 'Qual é o estado geral de conservação das carteiras e cadeiras dos alunos?',
           categoria: 'sala',
           tipo: 'multipla_escolha',
-          opcoes: ['Excelente', 'Bom', 'Regular', 'Ruim (necessita reparo)'],
-          obrigatoria: true
+          opcoes: [
+            'Excelente (todas novas e sem avarias)',
+            'Bom (pequeno desgaste natural)',
+            'Regular (algumas com folga ou pichadas)',
+            'Ruim (necessita reparo imediato)'
+          ],
+          obrigatoria: true,
+          ativa: true,
+          ordem: 3,
+          criadaEm: '2026-09-20T10:10:00.000Z',
         },
         {
           id: 'p-4',
           enunciado: 'Como foi o nível de foco, disciplina e participação da turma nesta aula?',
           categoria: 'turma',
           tipo: 'escala',
-          obrigatoria: true
+          obrigatoria: true,
+          ativa: true,
+          ordem: 4,
+          criadaEm: '2026-09-20T10:15:00.000Z',
         },
         {
           id: 'p-5',
-          enunciado: 'Houve ocorrência disciplinar grave ou necessidade de mediação pedagógica?',
+          enunciado: 'Os alunos trouxeram os materiais pedagógicos e realizaram as atividades propostas?',
           categoria: 'turma',
-          tipo: 'sim_nao',
-          obrigatoria: true
+          tipo: 'multipla_escolha',
+          opcoes: [
+            'Quase a totalidade (acima de 90%)',
+            'Maioria dos alunos (70% a 90%)',
+            'Cerca da metade (50%)',
+            'Minoria ou índice insuficiente (<50%)'
+          ],
+          obrigatoria: true,
+          ativa: true,
+          ordem: 5,
+          criadaEm: '2026-09-20T10:20:00.000Z',
         },
         {
           id: 'p-6',
-          enunciado: 'Observações adicionais ou solicitações de melhorias:',
+          enunciado: 'Houve alguma ocorrência disciplinar grave ou necessidade de mediação pedagógica?',
+          categoria: 'turma',
+          tipo: 'sim_nao',
+          obrigatoria: true,
+          ativa: true,
+          ordem: 6,
+          criadaEm: '2026-09-20T10:25:00.000Z',
+        },
+        {
+          id: 'p-7',
+          enunciado: 'Descreva observações adicionais, elogios ou solicitações de melhorias para esta sala ou turma:',
           categoria: 'geral',
           tipo: 'texto',
-          obrigatoria: false
+          obrigatoria: false,
+          ativa: true,
+          ordem: 7,
+          criadaEm: '2026-09-20T10:30:00.000Z',
+        },
+      ];
+
+      const INITIAL_RESPOSTAS = [
+        {
+          id: 'resp-1',
+          professorNome: 'Prof. Carlos Eduardo (Matemática)',
+          salaId: 'sala-101',
+          salaNome: 'Sala 101 (Bloco A)',
+          turmaId: 'turma-6a',
+          turmaNome: '6º Ano A',
+          respostas: {
+            'p-1': 5,
+            'p-2': 'Sim',
+            'p-3': 'Excelente (todas novas e sem avarias)',
+            'p-4': 4,
+            'p-5': 'Maioria dos alunos (70% a 90%)',
+            'p-6': 'Não',
+            'p-7': 'A turma participou muito bem da atividade com frações. A sala estava limpa e climatizada.',
+          },
+          criadaEm: '2026-09-24T09:40:00.000Z',
+          timestamp: 1790250000000,
+        },
+        {
+          id: 'resp-2',
+          professorNome: 'Profª. Mariana Lima (História)',
+          salaId: 'sala-204',
+          salaNome: 'Sala 204 (Multimídia)',
+          turmaId: 'turma-1em',
+          turmaNome: '1º Ano Ensino Médio',
+          respostas: {
+            'p-1': 4,
+            'p-2': 'Sim',
+            'p-3': 'Bom (pequeno desgaste natural)',
+            'p-4': 5,
+            'p-5': 'Quase a totalidade (acima de 90%)',
+            'p-6': 'Não',
+            'p-7': 'Ótima discussão sobre a era republicana. Cabo HDMI do projetor apresentou leve oscilação, favor verificar.',
+          },
+          criadaEm: '2026-09-24T11:15:00.000Z',
+          timestamp: 1790255700000,
+        },
+        {
+          id: 'resp-3',
+          professorNome: 'Prof. Roberto Silva (Ciências)',
+          salaId: 'sala-lab',
+          salaNome: 'Laboratório de Ciências',
+          turmaId: 'turma-8a',
+          turmaNome: '8º Ano A',
+          respostas: {
+            'p-1': 4,
+            'p-2': 'Sim',
+            'p-3': 'Bom (pequeno desgaste natural)',
+            'p-4': 3,
+            'p-5': 'Maioria dos alunos (70% a 90%)',
+            'p-6': 'Sim',
+            'p-7': 'Dois alunos se distraíram com reagentes no fundo do laboratório. Conversei com ambos após a aula.',
+          },
+          criadaEm: '2026-09-24T14:30:00.000Z',
+          timestamp: 1790267400000,
+        },
+      ];
+
+      class StandaloneDB {
+        constructor() {
+          this.dbPromise = null;
         }
-      ]
-    };
 
-    function initDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        openDB() {
+          if (this.dbPromise) return this.dbPromise;
 
-        req.onupgradeneeded = (e) => {
-          const d = e.target.result;
-          if (!d.objectStoreNames.contains('salas')) d.createObjectStore('salas', { keyPath: 'id' });
-          if (!d.objectStoreNames.contains('turmas')) d.createObjectStore('turmas', { keyPath: 'id' });
-          if (!d.objectStoreNames.contains('perguntas')) d.createObjectStore('perguntas', { keyPath: 'id' });
-          if (!d.objectStoreNames.contains('respostas')) {
-            const st = d.createObjectStore('respostas', { keyPath: 'id' });
-            st.createIndex('timestamp', 'timestamp');
+          if (typeof window === 'undefined' || !window.indexedDB) {
+            return Promise.reject(new Error('IndexedDB indisponível'));
+          }
+
+          this.dbPromise = new Promise((resolve, reject) => {
+            const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+            request.onupgradeneeded = (event) => {
+              const db = event.target.result;
+              if (!db.objectStoreNames.contains('perguntas')) {
+                const store = db.createObjectStore('perguntas', { keyPath: 'id' });
+                store.createIndex('categoria', 'categoria', { unique: false });
+                store.createIndex('ordem', 'ordem', { unique: false });
+              }
+              if (!db.objectStoreNames.contains('respostas')) {
+                const store = db.createObjectStore('respostas', { keyPath: 'id' });
+                store.createIndex('salaId', 'salaId', { unique: false });
+                store.createIndex('turmaId', 'turmaId', { unique: false });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+                store.createIndex('professorNome', 'professorNome', { unique: false });
+              }
+              if (!db.objectStoreNames.contains('salas')) {
+                db.createObjectStore('salas', { keyPath: 'id' });
+              }
+              if (!db.objectStoreNames.contains('turmas')) {
+                db.createObjectStore('turmas', { keyPath: 'id' });
+              }
+            };
+
+            request.onsuccess = async () => {
+              const db = request.result;
+              try {
+                await this.seedDefaultsIfEmpty(db);
+              } catch (e) {
+                console.warn('Seed error:', e);
+              }
+              resolve(db);
+            };
+
+            request.onerror = () => {
+              reject(request.error);
+            };
+          });
+
+          return this.dbPromise;
+        }
+
+        async seedDefaultsIfEmpty(db) {
+          const checkEmpty = (storeName) => {
+            return new Promise((res) => {
+              const tx = db.transaction(storeName, 'readonly');
+              const store = tx.objectStore(storeName);
+              const req = store.count();
+              req.onsuccess = () => res(req.result === 0);
+              req.onerror = () => res(false);
+            });
+          };
+
+          const salasEmpty = await checkEmpty('salas');
+          if (salasEmpty) {
+            const tx = db.transaction('salas', 'readwrite');
+            const store = tx.objectStore('salas');
+            INITIAL_SALAS.forEach((s) => store.put(s));
+          }
+
+          const turmasEmpty = await checkEmpty('turmas');
+          if (turmasEmpty) {
+            const tx = db.transaction('turmas', 'readwrite');
+            const store = tx.objectStore('turmas');
+            INITIAL_TURMAS.forEach((t) => store.put(t));
+          }
+
+          const perguntasEmpty = await checkEmpty('perguntas');
+          if (perguntasEmpty) {
+            const tx = db.transaction('perguntas', 'readwrite');
+            const store = tx.objectStore('perguntas');
+            INITIAL_PERGUNTAS.forEach((p) => store.put(p));
+          }
+
+          const respostasEmpty = await checkEmpty('respostas');
+          if (respostasEmpty) {
+            const tx = db.transaction('respostas', 'readwrite');
+            const store = tx.objectStore('respostas');
+            INITIAL_RESPOSTAS.forEach((r) => store.put(r));
+          }
+        }
+
+        async getAll(storeName) {
+          try {
+            const db = await this.openDB();
+            return new Promise((resolve, reject) => {
+              const tx = db.transaction(storeName, 'readonly');
+              const store = tx.objectStore(storeName);
+              const req = store.getAll();
+              req.onsuccess = () => resolve(req.result);
+              req.onerror = () => reject(req.error);
+            });
+          } catch {
+            const raw = localStorage.getItem(`fallback_${storeName}`);
+            if (raw) return JSON.parse(raw);
+            if (storeName === 'perguntas') return INITIAL_PERGUNTAS;
+            if (storeName === 'salas') return INITIAL_SALAS;
+            if (storeName === 'turmas') return INITIAL_TURMAS;
+            if (storeName === 'respostas') return INITIAL_RESPOSTAS;
+            return [];
+          }
+        }
+
+        async putItem(storeName, item) {
+          try {
+            const db = await this.openDB();
+            return new Promise((resolve, reject) => {
+              const tx = db.transaction(storeName, 'readwrite');
+              const store = tx.objectStore(storeName);
+              const req = store.put(item);
+              req.onsuccess = () => resolve();
+              req.onerror = () => reject(req.error);
+            });
+          } catch {
+            const list = await this.getAll(storeName);
+            const idx = list.findIndex((i) => i.id === item.id);
+            if (idx >= 0) list[idx] = item;
+            else list.push(item);
+            localStorage.setItem(`fallback_${storeName}`, JSON.stringify(list));
+          }
+        }
+
+        async deleteItem(storeName, id) {
+          try {
+            const db = await this.openDB();
+            return new Promise((resolve, reject) => {
+              const tx = db.transaction(storeName, 'readwrite');
+              const store = tx.objectStore(storeName);
+              const req = store.delete(id);
+              req.onsuccess = () => resolve();
+              req.onerror = () => reject(req.error);
+            });
+          } catch {
+            const list = await this.getAll(storeName);
+            const filtered = list.filter((i) => i.id !== id);
+            localStorage.setItem(`fallback_${storeName}`, JSON.stringify(filtered));
+          }
+        }
+
+        async restaurarPadrao() {
+          try {
+            const db = await this.openDB();
+            const stores = ['perguntas', 'salas', 'turmas', 'respostas'];
+            for (const st of stores) {
+              const tx = db.transaction(st, 'readwrite');
+              tx.objectStore(st).clear();
+            }
+            await this.seedDefaultsIfEmpty(db);
+          } catch {
+            localStorage.removeItem('fallback_perguntas');
+            localStorage.removeItem('fallback_salas');
+            localStorage.removeItem('fallback_turmas');
+            localStorage.removeItem('fallback_respostas');
+          }
+        }
+      }
+
+      const db = new StandaloneDB();
+
+      // ==========================================
+      // COMPONENTES DE ÍCONES SVG LEVES & CONFIÁVEIS
+      // ==========================================
+      const IconSchool = ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.333A48.29 48.29 0 0012 9.75c-2.551 0-5.056.2-7.5.583V21m15 0h2.25m-19.5 0h2.25" />
+        </svg>
+      );
+
+      const IconShield = ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+      );
+
+      const IconGraduation = ({ className = "w-5 h-5" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-5.25 6.557q.06.31.137.616" />
+        </svg>
+      );
+
+      const IconDownload = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+        </svg>
+      );
+
+      const IconLogout = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+        </svg>
+      );
+
+      const IconDatabase = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+        </svg>
+      );
+
+      const IconCheck = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      );
+
+      const IconPlus = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      );
+
+      const IconTrash = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+        </svg>
+      );
+
+      const IconStar = ({ className = "w-4 h-4", filled = false }) => (
+        <svg className={className} fill={filled ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+        </svg>
+      );
+
+      const IconUsers = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+        </svg>
+      );
+
+      const IconBuilding = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+        </svg>
+      );
+
+      // Função utilitária para baixar este próprio arquivo HTML
+      function baixarArquivoHtmlAtual() {
+        const conteudo = "<!doctype html>\n" + document.documentElement.outerHTML;
+        const blob = new Blob([conteudo], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'questionario-escolar-autonomo.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      // ==========================================
+      // APLICAÇÃO PRINCIPAL REACT
+      // ==========================================
+      function App() {
+        const [session, setSession] = useState(() => {
+          try {
+            const saved = localStorage.getItem('escola_user_session');
+            return saved ? JSON.parse(saved) : null;
+          } catch {
+            return null;
+          }
+        });
+
+        const [perguntas, setPerguntas] = useState([]);
+        const [respostas, setRespostas] = useState([]);
+        const [salas, setSalas] = useState([]);
+        const [turmas, setTurmas] = useState([]);
+        const [isLoading, setIsLoading] = useState(true);
+
+        const carregarDados = async () => {
+          try {
+            const [pList, rList, sList, tList] = await Promise.all([
+              db.getAll('perguntas'),
+              db.getAll('respostas'),
+              db.getAll('salas'),
+              db.getAll('turmas'),
+            ]);
+            setPerguntas(pList.sort((a, b) => a.ordem - b.ordem));
+            setRespostas(rList.sort((a, b) => b.timestamp - a.timestamp));
+            setSalas(sList);
+            setTurmas(tList);
+          } catch (e) {
+            console.error('Erro ao carregar dados:', e);
+          } finally {
+            setIsLoading(false);
           }
         };
 
-        req.onsuccess = async (e) => {
-          db = e.target.result;
-          await seedIfEmpty();
-          resolve(db);
+        useEffect(() => {
+          carregarDados();
+        }, []);
+
+        const handleLogin = (userSession) => {
+          setSession(userSession);
+          try {
+            localStorage.setItem('escola_user_session', JSON.stringify(userSession));
+          } catch {}
         };
 
-        req.onerror = () => reject(req.error);
-      });
-    }
+        const handleLogout = () => {
+          setSession(null);
+          try {
+            localStorage.removeItem('escola_user_session');
+          } catch {}
+        };
 
-    async function seedIfEmpty() {
-      const salasCount = await countStore('salas');
-      if (salasCount === 0) {
-        for (let s of DADOS_INICIAIS.salas) await saveStore('salas', s);
-        for (let t of DADOS_INICIAIS.turmas) await saveStore('turmas', t);
-        for (let p of DADOS_INICIAIS.perguntas) await saveStore('perguntas', p);
-      }
-    }
+        // Respostas
+        const handleSalvarResposta = async (respostaData) => {
+          const now = Date.now();
+          const nova = {
+            ...respostaData,
+            id: 'resp-' + now,
+            criadaEm: new Date(now).toISOString(),
+            timestamp: now,
+          };
+          await db.putItem('respostas', nova);
+          const lista = await db.getAll('respostas');
+          setRespostas(lista.sort((a, b) => b.timestamp - a.timestamp));
+        };
 
-    function countStore(storeName) {
-      return new Promise((res) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const st = tx.objectStore(storeName);
-        const req = st.count();
-        req.onsuccess = () => res(req.result);
-        req.onerror = () => res(0);
-      });
-    }
+        // Perguntas
+        const handleAddPergunta = async (perguntaData) => {
+          const nova = {
+            ...perguntaData,
+            id: 'p-' + Date.now(),
+            ordem: perguntas.length + 1,
+            criadaEm: new Date().toISOString(),
+          };
+          await db.putItem('perguntas', nova);
+          const lista = await db.getAll('perguntas');
+          setPerguntas(lista.sort((a, b) => a.ordem - b.ordem));
+        };
 
-    function getAllStore(storeName) {
-      return new Promise((res, rej) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const st = tx.objectStore(storeName);
-        const req = st.getAll();
-        req.onsuccess = () => res(req.result || []);
-        req.onerror = () => rej(req.error);
-      });
-    }
+        const handleDeletePergunta = async (id) => {
+          await db.deleteItem('perguntas', id);
+          const lista = await db.getAll('perguntas');
+          setPerguntas(lista.sort((a, b) => a.ordem - b.ordem));
+        };
 
-    function saveStore(storeName, item) {
-      return new Promise((res, rej) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const st = tx.objectStore(storeName);
-        const req = st.put(item);
-        req.onsuccess = () => res();
-        req.onerror = () => rej(req.error);
-      });
-    }
+        const handleTogglePerguntaAtiva = async (id, ativa) => {
+          const p = perguntas.find((item) => item.id === id);
+          if (!p) return;
+          const atualizada = { ...p, ativa };
+          await db.putItem('perguntas', atualizada);
+          const lista = await db.getAll('perguntas');
+          setPerguntas(lista.sort((a, b) => a.ordem - b.ordem));
+        };
 
-    function deleteStore(storeName, id) {
-      return new Promise((res, rej) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const st = tx.objectStore(storeName);
-        const req = st.delete(id);
-        req.onsuccess = () => res();
-        req.onerror = () => rej(req.error);
-      });
-    }
+        // Salas
+        const handleAddSala = async (nome, bloco) => {
+          const nova = { id: 'sala-' + Date.now(), nome, bloco };
+          await db.putItem('salas', nova);
+          const lista = await db.getAll('salas');
+          setSalas(lista);
+        };
 
-    // ==========================================
-    // ESTADO E SESSÃO
-    // ==========================================
-    let currentUser = null; // { role: 'diretor' | 'professor', nome, salaId, salaNome, turmaId, turmaNome }
+        const handleDeleteSala = async (id) => {
+          await db.deleteItem('salas', id);
+          const lista = await db.getAll('salas');
+          setSalas(lista);
+        };
 
-    function showToast(msg) {
-      const el = document.getElementById('toastMessage');
-      el.textContent = msg;
-      el.style.display = 'block';
-      setTimeout(() => el.style.display = 'none', 3000);
-    }
+        // Turmas
+        const handleAddTurma = async (nome, turno) => {
+          const nova = { id: 'turma-' + Date.now(), nome, turno };
+          await db.putItem('turmas', nova);
+          const lista = await db.getAll('turmas');
+          setTurmas(lista);
+        };
 
-    function selectRole(role) {
-      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
-      document.getElementById('diretorForm').style.display = 'none';
-      document.getElementById('professorForm').style.display = 'none';
+        const handleDeleteTurma = async (id) => {
+          await db.deleteItem('turmas', id);
+          const lista = await db.getAll('turmas');
+          setTurmas(lista);
+        };
 
-      if (role === 'diretor') {
-        document.getElementById('diretorForm').style.display = 'block';
-      } else {
-        document.getElementById('professorForm').style.display = 'block';
-        carregarSelectsProfessor();
-      }
-    }
+        const handleDeleteResposta = async (id) => {
+          await db.deleteItem('respostas', id);
+          const lista = await db.getAll('respostas');
+          setRespostas(lista.sort((a, b) => b.timestamp - a.timestamp));
+        };
 
-    async function carregarSelectsProfessor() {
-      const salas = await getAllStore('salas');
-      const turmas = await getAllStore('turmas');
+        const handleResetDefaults = async () => {
+          if (confirm('Deseja restaurar as perguntas, salas, turmas e respostas de demonstração padrão?')) {
+            setIsLoading(true);
+            await db.restaurarPadrao();
+            await carregarDados();
+            setIsLoading(false);
+          }
+        };
 
-      const sSel = document.getElementById('profSalaSelect');
-      const tSel = document.getElementById('profTurmaSelect');
+        const handleExportCsv = () => {
+          if (respostas.length === 0) {
+            alert('Não há respostas salvas para exportar.');
+            return;
+          }
+          let csv = '\uFEFF';
+          csv += 'Data/Hora,Professor,Sala,Turma';
+          perguntas.forEach((p) => {
+            csv += `,"${p.enunciado.replace(/"/g, '""')}"`;
+          });
+          csv += '\n';
 
-      sSel.innerHTML = salas.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
-      tSel.innerHTML = turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
-    }
+          respostas.forEach((r) => {
+            const dataStr = new Date(r.timestamp).toLocaleString('pt-BR');
+            let row = `"${dataStr}","${r.professorNome}","${r.salaNome}","${r.turmaNome}"`;
+            perguntas.forEach((p) => {
+              const val = r.respostas[p.id] !== undefined ? r.respostas[p.id] : '';
+              row += `,"${String(val).replace(/"/g, '""')}"`;
+            });
+            csv += row + '\n';
+          });
 
-    function loginDiretor() {
-      const s = document.getElementById('diretorSenha').value;
-      if (s !== 'admin123' && s.trim() !== '') {
-        // Aceita admin123 ou avisa
-      }
-      currentUser = { role: 'diretor', nome: 'Diretoria Escolar' };
-      renderHeader();
-      mostrarTela('diretor');
-      carregarPerguntasDiretor();
-    }
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `relatorio_escolar_${Date.now()}.csv`;
+          link.click();
+          URL.revokeObjectURL(url);
+        };
 
-    function loginProfessor() {
-      const nome = document.getElementById('profNome').value.trim();
-      const sSel = document.getElementById('profSalaSelect');
-      const tSel = document.getElementById('profTurmaSelect');
+        const handleExportJson = () => {
+          const backup = {
+            sistema: 'EscolaQuestionarioDB',
+            versao: 1,
+            exportadoEm: new Date().toISOString(),
+            dados: { perguntas, salas, turmas, respostas },
+          };
+          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `backup_escolar_${Date.now()}.json`;
+          link.click();
+          URL.revokeObjectURL(url);
+        };
 
-      if (!nome) {
-        alert('Por favor, informe seu nome.');
-        return;
-      }
+        const handleImportJson = (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            try {
+              const parsed = JSON.parse(event.target.result);
+              if (!parsed.dados) throw new Error('Formato inválido');
+              const { perguntas: p, salas: s, turmas: t, respostas: r } = parsed.dados;
+              if (Array.isArray(p)) for (const item of p) await db.putItem('perguntas', item);
+              if (Array.isArray(s)) for (const item of s) await db.putItem('salas', item);
+              if (Array.isArray(t)) for (const item of t) await db.putItem('turmas', item);
+              if (Array.isArray(r)) for (const item of r) await db.putItem('respostas', item);
+              await carregarDados();
+              alert('Backup importado com sucesso!');
+            } catch (err) {
+              alert('Erro ao importar arquivo JSON: ' + err.message);
+            }
+          };
+          reader.readAsText(file);
+        };
 
-      currentUser = {
-        role: 'professor',
-        nome: nome,
-        salaId: sSel.value,
-        salaNome: sSel.options[sSel.selectedIndex]?.text,
-        turmaId: tSel.value,
-        turmaNome: tSel.options[tSel.selectedIndex]?.text
-      };
+        const handleChangeSalaTurma = (salaId, salaNome, turmaId, turmaNome) => {
+          if (!session) return;
+          const updated = { ...session, salaId, salaNome, turmaId, turmaNome };
+          setSession(updated);
+          try {
+            localStorage.setItem('escola_user_session', JSON.stringify(updated));
+          } catch {}
+        };
 
-      renderHeader();
-      mostrarTela('professor');
-      carregarQuestionarioProfessor();
-    }
-
-    function logout() {
-      currentUser = null;
-      renderHeader();
-      mostrarTela('login');
-    }
-
-    function renderHeader() {
-      const el = document.getElementById('headerUserArea');
-      if (!currentUser) {
-        el.innerHTML = '<span>Não autenticado</span>';
-        return;
-      }
-
-      const roleBadge = currentUser.role === 'diretor'
-        ? '<strong style="color: var(--primary);">DIRETOR</strong>'
-        : '<strong style="color: var(--success);">PROFESSOR</strong>';
-
-      el.innerHTML = `
-        <span>${roleBadge} &bull; ${currentUser.nome}</span>
-        <button class="btn btn-secondary" onclick="logout()" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Sair</button>
-      `;
-    }
-
-    function mostrarTela(tela) {
-      document.getElementById('viewLogin').style.display = tela === 'login' ? 'block' : 'none';
-      document.getElementById('viewDiretor').style.display = tela === 'diretor' ? 'block' : 'none';
-      document.getElementById('viewProfessor').style.display = tela === 'professor' ? 'block' : 'none';
-    }
-
-    // ==========================================
-    // FUNÇÕES DO DIRETOR
-    // ==========================================
-    function switchDiretorTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById('diretorTabPerguntas').style.display = tab === 'perguntas' ? 'block' : 'none';
-      document.getElementById('diretorTabRespostas').style.display = tab === 'respostas' ? 'block' : 'none';
-      document.getElementById('diretorTabSalasTurmas').style.display = tab === 'salasturmas' ? 'block' : 'none';
-
-      if (tab === 'perguntas') {
-        document.getElementById('tabBtnPerguntas').classList.add('active');
-        carregarPerguntasDiretor();
-      } else if (tab === 'respostas') {
-        document.getElementById('tabBtnRespostas').classList.add('active');
-        carregarRespostasDiretor();
-      } else {
-        document.getElementById('tabBtnSalasTurmas').classList.add('active');
-        carregarSalasTurmasConfig();
-      }
-    }
-
-    function toggleOpcoesMultipla() {
-      const tipo = document.getElementById('perguntaTipo').value;
-      document.getElementById('grupoOpcoesMultipla').style.display = tipo === 'multipla_escolha' ? 'block' : 'none';
-    }
-
-    async function salvarNovaPergunta(e) {
-      e.preventDefault();
-      const enunciado = document.getElementById('perguntaEnunciado').value.trim();
-      const categoria = document.getElementById('perguntaCategoria').value;
-      const tipo = document.getElementById('perguntaTipo').value;
-      const obrigatoria = document.getElementById('perguntaObrigatoria').value === 'true';
-
-      let opcoes = undefined;
-      if (tipo === 'multipla_escolha') {
-        const raw = document.getElementById('perguntaOpcoes').value.trim();
-        opcoes = raw.split('\n').map(o => o.trim()).filter(Boolean);
-        if (opcoes.length < 2) {
-          alert('Por favor, informe ao menos 2 opções para a múltipla escolha.');
-          return;
-        }
-      }
-
-      const nova = {
-        id: 'p-' + Date.now(),
-        enunciado,
-        categoria,
-        tipo,
-        opcoes,
-        obrigatoria
-      };
-
-      await saveStore('perguntas', nova);
-      document.getElementById('formNovaPergunta').reset();
-      toggleOpcoesMultipla();
-      showToast('Pergunta cadastrada com sucesso no IndexedDB!');
-      carregarPerguntasDiretor();
-    }
-
-    async function excluirPergunta(id) {
-      if (confirm('Tem certeza de que deseja excluir esta pergunta?')) {
-        await deleteStore('perguntas', id);
-        showToast('Pergunta removida!');
-        carregarPerguntasDiretor();
-      }
-    }
-
-    async function carregarPerguntasDiretor() {
-      const perguntas = await getAllStore('perguntas');
-      const container = document.getElementById('listaPerguntasContainer');
-      document.getElementById('totalPerguntasBadge').textContent = `${perguntas.length} pergunta(s)`;
-
-      if (perguntas.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma pergunta cadastrada no momento.</p>';
-        return;
-      }
-
-      const tipoNomes = {
-        escala: 'Escala 1 a 5',
-        sim_nao: 'Sim/Não',
-        multipla_escolha: 'Múltipla Escolha',
-        texto: 'Texto'
-      };
-
-      const catNomes = {
-        sala: 'Foco: Sala',
-        turma: 'Foco: Turma',
-        geral: 'Geral'
-      };
-
-      container.innerHTML = perguntas.map(p => `
-        <div class="question-row">
-          <div style="flex: 1;">
-            <div style="font-weight: 600; font-size: 0.95rem;">${p.enunciado}</div>
-            <div class="question-meta">
-              <span>${catNomes[p.categoria] || p.categoria}</span> &bull;
-              <span>${tipoNomes[p.tipo] || p.tipo}</span> &bull;
-              <span>${p.obrigatoria ? 'Obrigatória' : 'Opcional'}</span>
-              ${p.opcoes ? ` &bull; <em>${p.opcoes.join(', ')}</em>` : ''}
+        if (isLoading) {
+          return (
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-700">
+              <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+              <p className="text-sm font-semibold text-slate-800">Conectando ao Banco de Dados IndexedDB...</p>
+              <p className="text-xs text-slate-400 mt-1">Carregando salas, turmas e questionários</p>
             </div>
-          </div>
-          <div>
-            <button class="btn btn-danger" onclick="excluirPergunta('${p.id}')" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">
-              Excluir
-            </button>
-          </div>
-        </div>
-      `).join('');
-    }
+          );
+        }
 
-    async function carregarRespostasDiretor() {
-      const respostas = await getAllStore('respostas');
-      const perguntas = await getAllStore('perguntas');
-      const container = document.getElementById('respostasContainer');
+        return (
+          <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+            {/* CABEÇALHO SUPERIOR */}
+            <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-xs">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm">
+                    <IconSchool className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-lg font-bold tracking-tight text-slate-900 block leading-tight">
+                      Colégio Saber Ativo
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium hidden sm:block">
+                      Sistema de Avaliação de Salas & Turmas (Autônomo)
+                    </span>
+                  </div>
+                </div>
 
-      if (respostas.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma resposta registrada ainda.</p>';
-        return;
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <button
+                    onClick={baixarArquivoHtmlAtual}
+                    title="Baixar este arquivo HTML único e autônomo para rodar localmente ou subir no GitHub"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 rounded-lg transition-colors whitespace-nowrap cursor-pointer"
+                  >
+                    <IconDownload className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Baixar Arquivo HTML Único</span>
+                    <span className="sm:hidden">Baixar HTML</span>
+                  </button>
+
+                  {session ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-lg border border-slate-200 text-xs text-slate-700">
+                        {session.role === 'diretor' ? (
+                          <>
+                            <IconShield className="w-3.5 h-3.5 text-indigo-600" />
+                            <span className="font-semibold text-indigo-900">Direção</span>
+                          </>
+                        ) : (
+                          <>
+                            <IconGraduation className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="font-semibold text-emerald-900 truncate max-w-[120px]">{session.nome}</span>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        onClick={handleLogout}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-red-700 hover:bg-red-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                        title="Sair"
+                      >
+                        <IconLogout className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Sair</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                      <IconDatabase className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>IndexedDB Ativo</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </header>
+
+            {/* CONTEÚDO PRINCIPAL */}
+            <main className="flex-1">
+              {!session ? (
+                <ViewLogin
+                  salas={salas}
+                  turmas={turmas}
+                  onLogin={handleLogin}
+                  onDownloadHtml={baixarArquivoHtmlAtual}
+                />
+              ) : session.role === 'diretor' ? (
+                <ViewDiretor
+                  perguntas={perguntas}
+                  respostas={respostas}
+                  salas={salas}
+                  turmas={turmas}
+                  onAddPergunta={handleAddPergunta}
+                  onDeletePergunta={handleDeletePergunta}
+                  onTogglePerguntaAtiva={handleTogglePerguntaAtiva}
+                  onAddSala={handleAddSala}
+                  onDeleteSala={handleDeleteSala}
+                  onAddTurma={handleAddTurma}
+                  onDeleteTurma={handleDeleteTurma}
+                  onDeleteResposta={handleDeleteResposta}
+                  onResetDefaults={handleResetDefaults}
+                  onExportCsv={handleExportCsv}
+                  onExportJson={handleExportJson}
+                  onImportJson={handleImportJson}
+                  onDownloadHtml={baixarArquivoHtmlAtual}
+                />
+              ) : (
+                <ViewProfessor
+                  session={session}
+                  perguntas={perguntas}
+                  salas={salas}
+                  turmas={turmas}
+                  onSalvarResposta={handleSalvarResposta}
+                  onChangeSalaTurma={handleChangeSalaTurma}
+                />
+              )}
+            </main>
+
+            {/* RODAPÉ */}
+            <footer className="bg-white border-t border-slate-200 py-6 text-xs text-slate-500">
+              <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                <div>
+                  Colégio Saber Ativo &bull; Arquivo HTML Único &bull; 100% Autônomo e sem tela branca
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={baixarArquivoHtmlAtual}
+                    className="text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
+                  >
+                    Baixar Código (.html)
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <span className="font-mono text-[11px] text-slate-400">IndexedDB Local v1.0</span>
+                </div>
+              </div>
+            </footer>
+          </div>
+        );
       }
 
-      // Ordenar mais recente primeiro
-      respostas.sort((a,b) => b.timestamp - a.timestamp);
+      // ==========================================
+      // VIEW: LOGIN (ESCOLHA DE PERFIL)
+      // ==========================================
+      function ViewLogin({ salas, turmas, onLogin, onDownloadHtml }) {
+        const [selectedRole, setSelectedRole] = useState(null);
+        const [senha, setSenha] = useState('admin123');
+        const [profNome, setProfNome] = useState('');
+        const [profSalaId, setProfSalaId] = useState(salas[0]?.id || '');
+        const [profTurmaId, setProfTurmaId] = useState(turmas[0]?.id || '');
+        const [profErro, setProfErro] = useState('');
 
-      container.innerHTML = respostas.map(r => {
-        const dataStr = new Date(r.timestamp).toLocaleString('pt-BR');
-        const itensHtml = Object.entries(r.respostas).map(([pid, val]) => {
-          const pObj = perguntas.find(p => p.id === pid);
-          const enunci = pObj ? pObj.enunciado : pid;
-          return `<div style="margin-bottom: 0.35rem; font-size: 0.875rem;">
-            <strong>${enunci}:</strong> <span style="color: var(--primary); font-weight: 600;">${val}</span>
-          </div>`;
-        }).join('');
+        const handleDiretorSubmit = (e) => {
+          e.preventDefault();
+          onLogin({ role: 'diretor', nome: 'Diretoria Escolar' });
+        };
 
-        return `
-          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: #fafafa;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-              <div>
-                <strong style="color: #1e1b4b;">${r.professorNome}</strong>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">
-                  Sala: <strong>${r.salaNome}</strong> &bull; Turma: <strong>${r.turmaNome}</strong> &bull; ${dataStr}
+        const handleProfessorSubmit = (e) => {
+          e.preventDefault();
+          if (!profNome.trim()) {
+            setProfErro('Por favor, informe seu nome como professor(a).');
+            return;
+          }
+          const salaObj = salas.find((s) => s.id === profSalaId) || salas[0];
+          const turmaObj = turmas.find((t) => t.id === profTurmaId) || turmas[0];
+
+          onLogin({
+            role: 'professor',
+            nome: profNome.trim(),
+            salaId: salaObj?.id,
+            salaNome: salaObj?.nome,
+            turmaId: turmaObj?.id,
+            turmaNome: turmaObj?.nome,
+          });
+        };
+
+        const selecionarRapido = (nome, sIdx, tIdx) => {
+          setProfNome(nome);
+          if (salas[sIdx]) setProfSalaId(salas[sIdx].id);
+          if (turmas[tIdx]) setProfTurmaId(turmas[tIdx].id);
+          setProfErro('');
+        };
+
+        return (
+          <div className="max-w-5xl mx-auto px-4 py-8 sm:py-12">
+            {/* Banner de Apresentação */}
+            <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-2xl p-6 sm:p-10 text-white shadow-xl mb-8 relative overflow-hidden">
+              <div className="relative z-10 max-w-2xl">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 text-xs font-semibold mb-3">
+                  <IconDatabase className="w-3.5 h-3.5" />
+                  Arquivo Autônomo &bull; Banco IndexedDB Integrado
+                </div>
+                <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+                  Portal de Avaliação Contínua de Salas e Turmas
+                </h1>
+                <p className="mt-3 text-sm sm:text-base text-indigo-100/90 leading-relaxed">
+                  Sistema escolar completo em um único arquivo HTML. Funciona diretamente no seu navegador com banco de dados local, sem necessidade de servidores externos e sem tela branca no GitHub Pages.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-4 text-xs font-medium text-indigo-200">
+                  <span className="flex items-center gap-1">
+                    <IconCheck className="w-4 h-4 text-emerald-400" />
+                    IndexedDB Nativo do Navegador
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <IconCheck className="w-4 h-4 text-emerald-400" />
+                    Exportação CSV & Backup JSON
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <IconCheck className="w-4 h-4 text-emerald-400" />
+                    Perguntas e Respostas Dinâmicas
+                  </span>
                 </div>
               </div>
             </div>
-            <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);">
-              ${itensHtml}
+
+            {/* Seletor de Perfil */}
+            <div className="text-center mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Selecione seu Perfil de Acesso</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Escolha como deseja interagir com o questionário escolar hoje
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Card Diretor */}
+              <div
+                onClick={() => setSelectedRole('diretor')}
+                className={`bg-white rounded-2xl p-6 border-2 transition-all cursor-pointer ${
+                  selectedRole === 'diretor'
+                    ? 'border-indigo-600 shadow-md ring-2 ring-indigo-600/20'
+                    : 'border-slate-200 hover:border-indigo-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4">
+                  <IconShield className="w-6 h-6" />
+                </div>
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 mb-2">
+                  Gestão & Administração
+                </span>
+                <h3 className="text-xl font-bold text-slate-900">Diretor(a) Escolar</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Cadastre perguntas personalizadas, gerencie salas e turmas, acompanhe métricas e exporte relatórios em CSV.
+                </p>
+
+                {selectedRole === 'diretor' && (
+                  <form onSubmit={handleDiretorSubmit} className="mt-6 pt-5 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Senha de Acesso da Direção:
+                    </label>
+                    <input
+                      type="password"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      placeholder="Senha padrão: admin123"
+                      className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 mb-3"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg transition-colors shadow-xs cursor-pointer"
+                    >
+                      Entrar no Painel da Direção &rarr;
+                    </button>
+                    <p className="text-[11px] text-slate-400 text-center mt-2">
+                      Dica: Senha de demonstração pré-preenchida (<span className="font-mono">admin123</span>)
+                    </p>
+                  </form>
+                )}
+              </div>
+
+              {/* Card Professor */}
+              <div
+                onClick={() => setSelectedRole('professor')}
+                className={`bg-white rounded-2xl p-6 border-2 transition-all cursor-pointer ${
+                  selectedRole === 'professor'
+                    ? 'border-emerald-600 shadow-md ring-2 ring-emerald-600/20'
+                    : 'border-slate-200 hover:border-emerald-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-4">
+                  <IconGraduation className="w-6 h-6" />
+                </div>
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 mb-2">
+                  Corpo Docente
+                </span>
+                <h3 className="text-xl font-bold text-slate-900">Professor(a)</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Responda o questionário diário ou semanal sobre as condições da sala e o engajamento da turma em que lecionou.
+                </p>
+
+                {selectedRole === 'professor' && (
+                  <form onSubmit={handleProfessorSubmit} className="mt-6 pt-5 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                    {profErro && (
+                      <div className="p-2.5 mb-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+                        {profErro}
+                      </div>
+                    )}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Seu Nome Completo: <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={profNome}
+                          onChange={(e) => {
+                            setProfNome(e.target.value);
+                            setProfErro('');
+                          }}
+                          placeholder="Ex: Prof. Carlos Eduardo (Matemática)"
+                          className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-slate-50"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Sala Utilizada:
+                          </label>
+                          <select
+                            value={profSalaId}
+                            onChange={(e) => setProfSalaId(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-slate-50"
+                          >
+                            {salas.map((s) => (
+                              <option key={s.id} value={s.id}>{s.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Turma Atendida:
+                          </label>
+                          <select
+                            value={profTurmaId}
+                            onChange={(e) => setProfTurmaId(e.target.value)}
+                            className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-slate-50"
+                          >
+                            {turmas.map((t) => (
+                              <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="pt-1">
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          Ou preencha rápido com um exemplo:
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => selecionarRapido('Prof. Carlos Eduardo (Matemática)', 0, 0)}
+                            className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200"
+                          >
+                            Prof. Carlos &bull; Sala 101
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => selecionarRapido('Profª. Mariana Lima (História)', 4, 4)}
+                            className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200"
+                          >
+                            Profª Mariana &bull; Sala 204
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-lg transition-colors shadow-xs mt-2 cursor-pointer"
+                      >
+                        Iniciar Avaliação como Professor &rarr;
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           </div>
-        `;
-      }).join('');
-    }
-
-    async function carregarSalasTurmasConfig() {
-      const salas = await getAllStore('salas');
-      const turmas = await getAllStore('turmas');
-
-      const sUl = document.getElementById('listaSalasConfig');
-      const tUl = document.getElementById('listaTurmasConfig');
-
-      sUl.innerHTML = salas.map(s => `
-        <li style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;">
-          <span>${s.nome}</span>
-          <button class="btn btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="removerSala('${s.id}')">Excluir</button>
-        </li>
-      `).join('');
-
-      tUl.innerHTML = turmas.map(t => `
-        <li style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;">
-          <span>${t.nome}</span>
-          <button class="btn btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="removerTurma('${t.id}')">Excluir</button>
-        </li>
-      `).join('');
-    }
-
-    async function adicionarSala(e) {
-      e.preventDefault();
-      const inp = document.getElementById('novaSalaNome');
-      const val = inp.value.trim();
-      if (!val) return;
-      await saveStore('salas', { id: 'sala-' + Date.now(), nome: val });
-      inp.value = '';
-      carregarSalasTurmasConfig();
-      showToast('Sala cadastrada!');
-    }
-
-    async function removerSala(id) {
-      if (confirm('Excluir esta sala?')) {
-        await deleteStore('salas', id);
-        carregarSalasTurmasConfig();
-      }
-    }
-
-    async function adicionarTurma(e) {
-      e.preventDefault();
-      const inp = document.getElementById('novaTurmaNome');
-      const val = inp.value.trim();
-      if (!val) return;
-      await saveStore('turmas', { id: 'turma-' + Date.now(), nome: val });
-      inp.value = '';
-      carregarSalasTurmasConfig();
-      showToast('Turma cadastrada!');
-    }
-
-    async function removerTurma(id) {
-      if (confirm('Excluir esta turma?')) {
-        await deleteStore('turmas', id);
-        carregarSalasTurmasConfig();
-      }
-    }
-
-    async function exportarCSV() {
-      const respostas = await getAllStore('respostas');
-      const perguntas = await getAllStore('perguntas');
-      if (respostas.length === 0) {
-        alert('Nenhuma resposta para exportar.');
-        return;
+        );
       }
 
-      let csv = 'Data,Professor,Sala,Turma';
-      perguntas.forEach(p => {
-        csv += `,"${p.enunciado.replace(/"/g, '""')}"`;
-      });
-      csv += '\n';
+      // ==========================================
+      // VIEW: PROFESSOR (QUESTIONÁRIO)
+      // ==========================================
+      function ViewProfessor({ session, perguntas, salas, turmas, onSalvarResposta, onChangeSalaTurma }) {
+        const [respostasState, setRespostasState] = useState({});
+        const [isSubmitting, setIsSubmitting] = useState(false);
+        const [showSuccessCard, setShowSuccessCard] = useState(false);
+        const [showModalTroca, setShowModalTroca] = useState(false);
 
-      respostas.forEach(r => {
-        const d = new Date(r.timestamp).toLocaleString('pt-BR');
-        let line = `"${d}","${r.professorNome}","${r.salaNome}","${r.turmaNome}"`;
-        perguntas.forEach(p => {
-          const val = r.respostas[p.id] !== undefined ? r.respostas[p.id] : '';
-          line += `,"${String(val).replace(/"/g, '""')}"`;
-        });
-        csv += line + '\n';
-      });
+        const [tempSalaId, setTempSalaId] = useState(session.salaId || salas[0]?.id || '');
+        const [tempTurmaId, setTempTurmaId] = useState(session.turmaId || turmas[0]?.id || '');
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `respostas_escolares_${Date.now()}.csv`;
-      a.click();
-    }
+        const ativas = perguntas.filter((p) => p.ativa);
+        const totalPerguntas = ativas.length;
+        const respondidas = ativas.filter((p) => {
+          const val = respostasState[p.id];
+          return val !== undefined && val !== '';
+        }).length;
+        const percentual = totalPerguntas > 0 ? Math.round((respondidas / totalPerguntas) * 100) : 0;
 
-    async function exportarJSON() {
-      const salas = await getAllStore('salas');
-      const turmas = await getAllStore('turmas');
-      const perguntas = await getAllStore('perguntas');
-      const respostas = await getAllStore('respostas');
+        const handleSetValor = (pId, val) => {
+          setRespostasState((prev) => ({ ...prev, [pId]: val }));
+        };
 
-      const data = {
-        sistema: 'GestaoEscolarIndexedDB',
-        versao: 1,
-        exportadoEm: new Date().toISOString(),
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          for (const p of ativas) {
+            if (p.obrigatoria) {
+              const val = respostasState[p.id];
+              if (val === undefined || val === '') {
+                alert(`Por favor, responda a pergunta obrigatória:\n"${p.enunciado}"`);
+                return;
+              }
+            }
+          }
+
+          setIsSubmitting(true);
+          try {
+            await onSalvarResposta({
+              professorNome: session.nome,
+              salaId: session.salaId || 'sala-geral',
+              salaNome: session.salaNome || 'Sala Principal',
+              turmaId: session.turmaId || 'turma-geral',
+              turmaNome: session.turmaNome || 'Turma Principal',
+              respostas: respostasState,
+            });
+            setShowSuccessCard(true);
+            setRespostasState({});
+          } finally {
+            setIsSubmitting(false);
+          }
+        };
+
+        const handleConfirmarTroca = () => {
+          const s = salas.find((i) => i.id === tempSalaId) || salas[0];
+          const t = turmas.find((i) => i.id === tempTurmaId) || turmas[0];
+          onChangeSalaTurma(s.id, s.nome, t.id, t.nome);
+          setShowModalTroca(false);
+        };
+
+        if (showSuccessCard) {
+          return (
+            <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+              <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+                  <IconCheck className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl font-extrabold text-slate-900">Avaliação Salva com Sucesso!</h2>
+                <p className="text-slate-600 text-sm mt-2 max-w-md mx-auto">
+                  Suas respostas para a <strong>{session.salaNome}</strong> e turma <strong>{session.turmaNome}</strong> foram gravadas diretamente no banco de dados IndexedDB local.
+                </p>
+
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onClick={() => setShowSuccessCard(false)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg transition-colors cursor-pointer"
+                  >
+                    Responder para outra Sala/Turma
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            {/* Barra de identificação da aula */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                  Avaliação da Aula em Andamento
+                </span>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-xs font-bold text-indigo-800">
+                    <IconBuilding className="w-3.5 h-3.5 text-indigo-600" />
+                    {session.salaNome || 'Sala Padrão'}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-xs font-bold text-emerald-800">
+                    <IconUsers className="w-3.5 h-3.5 text-emerald-600" />
+                    {session.turmaNome || 'Turma Padrão'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowModalTroca(true)}
+                className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition-colors cursor-pointer"
+              >
+                Trocar Sala ou Turma
+              </button>
+            </div>
+
+            {/* Barra de progresso */}
+            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs mb-6">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
+                <span>Progresso das Respostas: {respondidas} de {totalPerguntas} concluídas</span>
+                <span className="text-indigo-600 font-bold">{percentual}%</span>
+              </div>
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${percentual}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Formulário com as perguntas */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {ativas.map((p, idx) => {
+                const valorAtual = respostasState[p.id];
+                const preenchida = valorAtual !== undefined && valorAtual !== '';
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`bg-white rounded-2xl p-5 sm:p-6 border transition-all ${
+                      preenchida
+                        ? 'border-indigo-200 shadow-xs ring-1 ring-indigo-50'
+                        : 'border-slate-200 shadow-xs'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide ${
+                          p.categoria === 'sala'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                            : p.categoria === 'turma'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                            : 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                        }`}>
+                          {p.categoria === 'sala' ? 'Condições da Sala' : p.categoria === 'turma' ? 'Comportamento da Turma' : 'Geral'}
+                        </span>
+                      </div>
+                      {p.obrigatoria && (
+                        <span className="text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                          Obrigatória
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="text-base font-semibold text-slate-900 leading-snug mb-4">
+                      {p.enunciado}
+                    </h3>
+
+                    {/* RENDERIZADOR POR TIPO */}
+                    {p.tipo === 'escala' && (
+                      <div>
+                        <div className="grid grid-cols-5 gap-2 sm:gap-3 max-w-md">
+                          {[1, 2, 3, 4, 5].map((num) => {
+                            const isSelected = valorAtual === num;
+                            return (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => handleSetValor(p.id, num)}
+                                className={`py-3 px-2 rounded-xl font-bold text-sm border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                                }`}
+                              >
+                                <span className="text-lg">{num}</span>
+                                <IconStar className="w-3.5 h-3.5" filled={isSelected} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between max-w-md text-[11px] text-slate-400 font-medium mt-2 px-1">
+                          <span>1 - Muito Ruim</span>
+                          <span>3 - Regular</span>
+                          <span>5 - Excelente</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {p.tipo === 'sim_nao' && (
+                      <div className="flex gap-3 max-w-xs">
+                        {['Sim', 'Não'].map((opt) => {
+                          const isSelected = valorAtual === opt;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => handleSetValor(p.id, opt)}
+                              className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-sm border flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                                isSelected ? 'border-white bg-white' : 'border-slate-400'
+                              }`}>
+                                {isSelected && <span className="w-2 h-2 rounded-full bg-indigo-600"></span>}
+                              </span>
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {p.tipo === 'multipla_escolha' && (
+                      <div className="space-y-2">
+                        {(p.opcoes || []).map((opt) => {
+                          const isSelected = valorAtual === opt;
+                          return (
+                            <label
+                              key={opt}
+                              onClick={() => handleSetValor(p.id, opt)}
+                              className={`flex items-center gap-3 p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-indigo-50/70 border-indigo-400 text-indigo-950 font-semibold'
+                                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`p_${p.id}`}
+                                checked={isSelected}
+                                onChange={() => handleSetValor(p.id, opt)}
+                                className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <span>{opt}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {p.tipo === 'texto' && (
+                      <textarea
+                        rows="3"
+                        value={valorAtual || ''}
+                        onChange={(e) => handleSetValor(p.id, e.target.value)}
+                        placeholder="Digite aqui suas observações sobre a sala ou a turma..."
+                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50"
+                      ></textarea>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="pt-4 pb-12">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <span>Gravando no Banco IndexedDB...</span>
+                  ) : (
+                    <>
+                      <span>Concluir e Enviar Avaliação</span>
+                      <IconCheck className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Modal de Troca de Sala / Turma */}
+            {showModalTroca && (
+              <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Trocar Sala ou Turma</h3>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Atualize o local ou a turma sem precisar reiniciar sua sessão.
+                  </p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sala:</label>
+                      <select
+                        value={tempSalaId}
+                        onChange={(e) => setTempSalaId(e.target.value)}
+                        className="w-full p-2.5 text-sm border border-slate-300 rounded-lg bg-slate-50"
+                      >
+                        {salas.map((s) => (
+                          <option key={s.id} value={s.id}>{s.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Turma:</label>
+                      <select
+                        value={tempTurmaId}
+                        onChange={(e) => setTempTurmaId(e.target.value)}
+                        className="w-full p-2.5 text-sm border border-slate-300 rounded-lg bg-slate-50"
+                      >
+                        {turmas.map((t) => (
+                          <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowModalTroca(false)}
+                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmarTroca}
+                      className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer"
+                    >
+                      Confirmar Troca
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // ==========================================
+      // VIEW: DIRETOR (PAINEL ADMINISTRATIVO COMPLETO)
+      // ==========================================
+      function ViewDiretor({
+        perguntas,
+        respostas,
         salas,
         turmas,
-        perguntas,
-        respostas
-      };
+        onAddPergunta,
+        onDeletePergunta,
+        onTogglePerguntaAtiva,
+        onAddSala,
+        onDeleteSala,
+        onAddTurma,
+        onDeleteTurma,
+        onDeleteResposta,
+        onResetDefaults,
+        onExportCsv,
+        onExportJson,
+        onImportJson,
+        onDownloadHtml,
+      }) {
+        const [abaAtiva, setAbaAtiva] = useState('perguntas');
 
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `backup_questionario_escolar_${Date.now()}.json`;
-      a.click();
-    }
+        // Form nova pergunta
+        const [showModalNovaPergunta, setShowModalNovaPergunta] = useState(false);
+        const [enunciado, setEnunciado] = useState('');
+        const [categoria, setCategoria] = useState('sala');
+        const [tipo, setTipo] = useState('escala');
+        const [opcoesTexto, setOpcoesTexto] = useState('Excelente\nBom\nRegular\nRuim');
+        const [obrigatoria, setObrigatoria] = useState(true);
 
-    // ==========================================
-    // FUNÇÕES DO PROFESSOR
-    // ==========================================
-    function trocarSalaTurma() {
-      selectRole('professor');
-      mostrarTela('login');
-    }
+        // Filtros respostas
+        const [filtroSala, setFiltroSala] = useState('todos');
+        const [filtroTurma, setFiltroTurma] = useState('todos');
+        const [filtroBusca, setFiltroBusca] = useState('');
+        const [detalheResposta, setDetalheResposta] = useState(null);
 
-    async function carregarQuestionarioProfessor() {
-      document.getElementById('profCabecalhoNome').textContent = currentUser.nome;
-      document.getElementById('profCabecalhoDetalhes').innerHTML = `Sala: <strong>${currentUser.salaNome}</strong> &bull; Turma: <strong>${currentUser.turmaNome}</strong>`;
+        // Nova Sala / Turma
+        const [novaSalaNome, setNovaSalaNome] = useState('');
+        const [novaSalaBloco, setNovaSalaBloco] = useState('Bloco Principal');
+        const [novaTurmaNome, setNovaTurmaNome] = useState('');
+        const [novaTurmaTurno, setNovaTurmaTurno] = useState('Manhã');
 
-      const perguntas = await getAllStore('perguntas');
-      const container = document.getElementById('questionarioContainer');
+        const handleSubmitNovaPergunta = async (e) => {
+          e.preventDefault();
+          if (!enunciado.trim()) return;
+          let opcoes = undefined;
+          if (tipo === 'multipla_escolha') {
+            opcoes = opcoesTexto.split('\n').map((s) => s.trim()).filter(Boolean);
+            if (opcoes.length < 2) {
+              alert('Informe pelo menos 2 opções para a múltipla escolha.');
+              return;
+            }
+          }
+          await onAddPergunta({
+            enunciado: enunciado.trim(),
+            categoria,
+            tipo,
+            opcoes,
+            obrigatoria,
+            ativa: true,
+          });
+          setEnunciado('');
+          setShowModalNovaPergunta(false);
+        };
 
-      if (perguntas.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhuma pergunta cadastrada pela direção no momento.</p>';
-        return;
-      }
+        const handleCriarSala = async (e) => {
+          e.preventDefault();
+          if (!novaSalaNome.trim()) return;
+          await onAddSala(novaSalaNome.trim(), novaSalaBloco.trim());
+          setNovaSalaNome('');
+        };
 
-      container.innerHTML = perguntas.map((p, idx) => {
-        let inputHtml = '';
+        const handleCriarTurma = async (e) => {
+          e.preventDefault();
+          if (!novaTurmaNome.trim()) return;
+          await onAddTurma(novaTurmaNome.trim(), novaTurmaTurno);
+          setNovaTurmaNome('');
+        };
 
-        if (p.tipo === 'escala') {
-          inputHtml = `
-            <div class="rating-buttons" id="rating_${p.id}">
-              ${[1, 2, 3, 4, 5].map(num => `
-                <button type="button" class="rating-btn" onclick="setRating('${p.id}', ${num})">${num}</button>
-              `).join('')}
-              <input type="hidden" name="pergunta_${p.id}" id="input_${p.id}" ${p.obrigatoria ? 'required' : ''}>
+        // Filtro de respostas
+        const respostasFiltradas = useMemo(() => {
+          return respostas.filter((r) => {
+            if (filtroSala !== 'todos' && r.salaId !== filtroSala) return false;
+            if (filtroTurma !== 'todos' && r.turmaId !== filtroTurma) return false;
+            if (filtroBusca.trim()) {
+              const b = filtroBusca.toLowerCase();
+              const nome = (r.professorNome || '').toLowerCase();
+              const obs = (r.respostas['p-7'] || '').toLowerCase();
+              if (!nome.includes(b) && !obs.includes(b)) return false;
+            }
+            return true;
+          });
+        }, [respostas, filtroSala, filtroTurma, filtroBusca]);
+
+        // Estatísticas
+        const mediaEscala = useMemo(() => {
+          let soma = 0;
+          let count = 0;
+          respostas.forEach((r) => {
+            Object.entries(r.respostas).forEach(([key, val]) => {
+              const p = perguntas.find((item) => item.id === key);
+              if (p && p.tipo === 'escala' && typeof val === 'number') {
+                soma += val;
+                count++;
+              }
+            });
+          });
+          return count > 0 ? (soma / count).toFixed(1) : '5.0';
+        }, [respostas, perguntas]);
+
+        return (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Avaliações</span>
+                <span className="text-2xl font-black text-indigo-600 mt-1 block">{respostas.length}</span>
+                <span className="text-[11px] text-slate-500">Registradas no IndexedDB</span>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Média Geral</span>
+                <span className="text-2xl font-black text-amber-500 mt-1 block flex items-center gap-1">
+                  {mediaEscala} <IconStar className="w-5 h-5 inline text-amber-400" filled />
+                </span>
+                <span className="text-[11px] text-slate-500">Escala de 1 a 5</span>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Perguntas Ativas</span>
+                <span className="text-2xl font-black text-slate-900 mt-1 block">
+                  {perguntas.filter((p) => p.ativa).length} <span className="text-sm font-normal text-slate-400">/ {perguntas.length}</span>
+                </span>
+                <span className="text-[11px] text-slate-500">Configuradas</span>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Salas</span>
+                <span className="text-2xl font-black text-slate-900 mt-1 block">{salas.length}</span>
+                <span className="text-[11px] text-slate-500">Monitoradas</span>
+              </div>
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs col-span-2 lg:col-span-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Turmas</span>
+                <span className="text-2xl font-black text-slate-900 mt-1 block">{turmas.length}</span>
+                <span className="text-[11px] text-slate-500">Cadastradas</span>
+              </div>
             </div>
-          `;
-        } else if (p.tipo === 'sim_nao') {
-          inputHtml = `
-            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
-              <label class="radio-option">
-                <input type="radio" name="pergunta_${p.id}" value="Sim" ${p.obrigatoria ? 'required' : ''}> Sim
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="pergunta_${p.id}" value="Não"> Não
-              </label>
-            </div>
-          `;
-        } else if (p.tipo === 'multipla_escolha') {
-          inputHtml = `
-            <div class="options-list">
-              ${(p.opcoes || []).map(opt => `
-                <label class="radio-option">
-                  <input type="radio" name="pergunta_${p.id}" value="${opt}" ${p.obrigatoria ? 'required' : ''}> ${opt}
-                </label>
-              `).join('')}
-            </div>
-          `;
-        } else {
-          inputHtml = `
-            <textarea name="pergunta_${p.id}" rows="3" placeholder="Sua resposta..." ${p.obrigatoria ? 'required' : ''}></textarea>
-          `;
-        }
 
-        return `
-          <div class="question-box" id="box_${p.id}">
-            <div style="font-weight: 700; margin-bottom: 0.35rem;">
-              ${idx + 1}. ${p.enunciado} ${p.obrigatoria ? '<span style="color: var(--danger);">*</span>' : ''}
+            {/* Abas do Painel */}
+            <div className="flex border-b border-slate-200 mb-6 overflow-x-auto gap-2">
+              <button
+                onClick={() => setAbaAtiva('perguntas')}
+                className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  abaAtiva === 'perguntas'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                1. Perguntas Cadastradas ({perguntas.length})
+              </button>
+              <button
+                onClick={() => setAbaAtiva('respostas')}
+                className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  abaAtiva === 'respostas'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                2. Respostas & Histórico ({respostas.length})
+              </button>
+              <button
+                onClick={() => setAbaAtiva('salas_turmas')}
+                className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  abaAtiva === 'salas_turmas'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                3. Salas & Turmas
+              </button>
+              <button
+                onClick={() => setAbaAtiva('backup')}
+                className={`pb-3 px-4 text-sm font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                  abaAtiva === 'backup'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                4. Exportações & Banco Local
+              </button>
             </div>
-            ${inputHtml}
+
+            {/* ABA 1: PERGUNTAS */}
+            {abaAtiva === 'perguntas' && (
+              <div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Gerenciador de Perguntas do Questionário</h2>
+                    <p className="text-xs text-slate-500">
+                      Cadastre, ative/desative ou exclua perguntas. Elas aparecem imediatamente no formulário dos professores.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowModalNovaPergunta(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                  >
+                    <IconPlus className="w-4 h-4" />
+                    <span>Cadastrar Nova Pergunta</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {perguntas.map((p, idx) => (
+                    <div
+                      key={p.id}
+                      className={`bg-white rounded-xl p-4 sm:p-5 border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+                        p.ativa ? 'border-slate-200 shadow-xs' : 'border-slate-200 bg-slate-50/60 opacity-60'
+                      }`}
+                    >
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-slate-400">#{idx + 1}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                            p.categoria === 'sala' ? 'bg-blue-100 text-blue-800' : p.categoria === 'turma' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {p.categoria === 'sala' ? 'Sala' : p.categoria === 'turma' ? 'Turma' : 'Geral'}
+                          </span>
+                          <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            Tipo: {p.tipo === 'escala' ? 'Escala 1 a 5' : p.tipo === 'sim_nao' ? 'Sim / Não' : p.tipo === 'multipla_escolha' ? 'Múltipla Escolha' : 'Texto Livre'}
+                          </span>
+                          {p.obrigatoria && (
+                            <span className="text-[10px] font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                              Obrigatória
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-slate-900">{p.enunciado}</p>
+                        {p.tipo === 'multipla_escolha' && p.opcoes && (
+                          <p className="text-xs text-slate-500">
+                            Opções: {p.opcoes.join(' | ')}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={p.ativa}
+                            onChange={(e) => onTogglePerguntaAtiva(p.id, e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded"
+                          />
+                          <span>{p.ativa ? 'Ativa' : 'Inativa'}</span>
+                        </label>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Excluir a pergunta: "${p.enunciado}"?`)) {
+                              onDeletePergunta(p.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Excluir pergunta"
+                        >
+                          <IconTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ABA 2: RESPOSTAS */}
+            {abaAtiva === 'respostas' && (
+              <div>
+                {/* Filtros */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Filtrar por Sala:</label>
+                    <select
+                      value={filtroSala}
+                      onChange={(e) => setFiltroSala(e.target.value)}
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                    >
+                      <option value="todos">Todas as salas ({salas.length})</option>
+                      {salas.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Filtrar por Turma:</label>
+                    <select
+                      value={filtroTurma}
+                      onChange={(e) => setFiltroTurma(e.target.value)}
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                    >
+                      <option value="todos">Todas as turmas ({turmas.length})</option>
+                      {turmas.map((t) => (
+                        <option key={t.id} value={t.id}>{t.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Buscar por Professor / Palavra:</label>
+                    <input
+                      type="text"
+                      value={filtroBusca}
+                      onChange={(e) => setFiltroBusca(e.target.value)}
+                      placeholder="Ex: Carlos, projetor..."
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Mostrando {respostasFiltradas.length} de {respostas.length} avaliações
+                  </span>
+                  <button
+                    onClick={onExportCsv}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <IconDownload className="w-3.5 h-3.5" />
+                    <span>Exportar Relatório CSV</span>
+                  </button>
+                </div>
+
+                {respostasFiltradas.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-400 text-sm">
+                    Nenhuma resposta encontrada para os filtros selecionados.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {respostasFiltradas.map((r) => {
+                      const dataFormatada = new Date(r.timestamp).toLocaleString('pt-BR');
+                      return (
+                        <div
+                          key={r.id}
+                          className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-xs hover:border-indigo-200 transition-all"
+                        >
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 text-sm">{r.professorNome}</span>
+                              <span className="text-xs text-slate-400">&bull;</span>
+                              <span className="text-xs text-slate-500 font-mono">{dataFormatada}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                {r.salaNome}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                {r.turmaNome}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  if (confirm('Deseja excluir este registro de avaliação?')) {
+                                    onDeleteResposta(r.id);
+                                  }
+                                }}
+                                className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors ml-2"
+                                title="Excluir resposta"
+                              >
+                                <IconTrash className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-slate-600 space-y-1 mb-3">
+                            {r.respostas['p-1'] && (
+                              <p>Condições físicas: <strong>Nota {r.respostas['p-1']} / 5</strong></p>
+                            )}
+                            {r.respostas['p-4'] && (
+                              <p>Engajamento da turma: <strong>Nota {r.respostas['p-4']} / 5</strong></p>
+                            )}
+                            {r.respostas['p-7'] && (
+                              <p className="italic text-slate-500 mt-1 line-clamp-2">
+                                &ldquo;{r.respostas['p-7']}&rdquo;
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => setDetalheResposta(r)}
+                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                          >
+                            Ver Respostas Completas &rarr;
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA 3: SALAS & TURMAS */}
+            {abaAtiva === 'salas_turmas' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Gestão de Salas */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <h3 className="text-base font-bold text-slate-900 mb-1">Salas & Laboratórios</h3>
+                  <p className="text-xs text-slate-500 mb-4">Adicione ou remova ambientes escolares monitorados.</p>
+
+                  <form onSubmit={handleCriarSala} className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={novaSalaNome}
+                      onChange={(e) => setNovaSalaNome(e.target.value)}
+                      placeholder="Nome da sala (ex: Sala 103)"
+                      className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer"
+                    >
+                      + Adicionar
+                    </button>
+                  </form>
+
+                  <div className="space-y-2">
+                    {salas.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                        <span className="font-semibold text-slate-800">{s.nome}</span>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remover a sala: "${s.nome}"?`)) onDeleteSala(s.id);
+                          }}
+                          className="text-slate-400 hover:text-red-600 p-1"
+                        >
+                          <IconTrash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gestão de Turmas */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
+                  <h3 className="text-base font-bold text-slate-900 mb-1">Turmas & Séries</h3>
+                  <p className="text-xs text-slate-500 mb-4">Adicione turmas e seus respectivos turnos escolares.</p>
+
+                  <form onSubmit={handleCriarTurma} className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={novaTurmaNome}
+                      onChange={(e) => setNovaTurmaNome(e.target.value)}
+                      placeholder="Nome da turma (ex: 2º Ano B)"
+                      className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                    />
+                    <select
+                      value={novaTurmaTurno}
+                      onChange={(e) => setNovaTurmaTurno(e.target.value)}
+                      className="px-2 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                    >
+                      <option value="Manhã">Manhã</option>
+                      <option value="Tarde">Tarde</option>
+                      <option value="Noite">Noite</option>
+                      <option value="Integral">Integral</option>
+                    </select>
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer"
+                    >
+                      + Adicionar
+                    </button>
+                  </form>
+
+                  <div className="space-y-2">
+                    {turmas.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                        <div>
+                          <span className="font-semibold text-slate-800">{t.nome}</span>
+                          <span className="text-slate-400 ml-1.5 font-normal">({t.turno})</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Remover a turma: "${t.nome}"?`)) onDeleteTurma(t.id);
+                          }}
+                          className="text-slate-400 hover:text-red-600 p-1"
+                        >
+                          <IconTrash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ABA 4: BACKUP & EXPORTAÇÕES */}
+            {abaAtiva === 'backup' && (
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs max-w-2xl">
+                <h3 className="text-base font-bold text-slate-900 mb-1">Ferramentas de Banco de Dados & Arquivo Único</h3>
+                <p className="text-xs text-slate-500 mb-6">
+                  Como este aplicativo é 100% autônomo, seus dados residem no banco de dados IndexedDB do seu navegador. Você pode exportar backups, planilhas CSV e baixar o código fonte HTML único.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">Exportar Relatório CSV (Excel)</h4>
+                      <p className="text-xs text-slate-500">Gera arquivo .csv com cabeçalho UTF-8 compatível com Excel e Google Planilhas.</p>
+                    </div>
+                    <button
+                      onClick={onExportCsv}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer"
+                    >
+                      Baixar .CSV
+                    </button>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">Backup Completo do Banco (JSON)</h4>
+                      <p className="text-xs text-slate-500">Salva todas as perguntas, salas, turmas e respostas em arquivo JSON.</p>
+                    </div>
+                    <button
+                      onClick={onExportJson}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer"
+                    >
+                      Exportar .JSON
+                    </button>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">Restaurar Backup (JSON)</h4>
+                      <p className="text-xs text-slate-500">Importa dados previamente salvos para o banco IndexedDB.</p>
+                    </div>
+                    <label className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer">
+                      Importar .JSON
+                      <input type="file" accept=".json" onChange={onImportJson} className="hidden" />
+                    </label>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-indigo-900">Baixar Este Arquivo HTML Único</h4>
+                      <p className="text-xs text-indigo-700">Gera o arquivo autônomo com Tailwind e React para salvar no seu PC ou subir no GitHub.</p>
+                    </div>
+                    <button
+                      onClick={onDownloadHtml}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer"
+                    >
+                      Baixar .HTML
+                    </button>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-red-200 bg-red-50/50 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-red-900">Restaurar Dados Padrão de Demonstração</h4>
+                      <p className="text-xs text-red-700">Recarrega as 7 perguntas oficiais, 6 salas, 6 turmas e 3 respostas de teste.</p>
+                    </div>
+                    <button
+                      onClick={onResetDefaults}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer"
+                    >
+                      Restaurar Padrões
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: NOVA PERGUNTA */}
+            {showModalNovaPergunta && (
+              <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Cadastrar Nova Pergunta</h3>
+                  <p className="text-xs text-slate-500 mb-4">Adicione uma nova pergunta que ficará disponível no questionário dos professores.</p>
+
+                  <form onSubmit={handleSubmitNovaPergunta} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Enunciado da Pergunta: *</label>
+                      <textarea
+                        rows="2"
+                        required
+                        value={enunciado}
+                        onChange={(e) => setEnunciado(e.target.value)}
+                        placeholder="Ex: Como você avalia a limpeza da sala de aula?"
+                        className="w-full p-2.5 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                      ></textarea>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Categoria:</label>
+                        <select
+                          value={categoria}
+                          onChange={(e) => setCategoria(e.target.value)}
+                          className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                        >
+                          <option value="sala">Condições da Sala</option>
+                          <option value="turma">Comportamento da Turma</option>
+                          <option value="geral">Geral / Observações</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Tipo de Resposta:</label>
+                        <select
+                          value={tipo}
+                          onChange={(e) => setTipo(e.target.value)}
+                          className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                        >
+                          <option value="escala">Escala de 1 a 5</option>
+                          <option value="sim_nao">Sim ou Não</option>
+                          <option value="multipla_escolha">Múltipla Escolha</option>
+                          <option value="texto">Texto Livre</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {tipo === 'multipla_escolha' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Opções de Escolha (uma por linha):
+                        </label>
+                        <textarea
+                          rows="4"
+                          value={opcoesTexto}
+                          onChange={(e) => setOpcoesTexto(e.target.value)}
+                          className="w-full p-2.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-mono"
+                        ></textarea>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={obrigatoria}
+                          onChange={(e) => setObrigatoria(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 rounded"
+                        />
+                        <span>Resposta Obrigatória para os professores</span>
+                      </label>
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowModalNovaPergunta(false)}
+                        className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer"
+                      >
+                        Salvar Pergunta
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: DETALHE COMPLETO DA RESPOSTA */}
+            {detalheResposta && (
+              <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl p-6 max-w-xl w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-start justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">{detalheResposta.professorNome}</h3>
+                      <p className="text-xs text-slate-500">
+                        {detalheResposta.salaNome} &bull; {detalheResposta.turmaNome} &bull; {new Date(detalheResposta.timestamp).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setDetalheResposta(null)}
+                      className="text-slate-400 hover:text-slate-700 p-1"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {perguntas.map((p, idx) => {
+                      const resposta = detalheResposta.respostas[p.id];
+                      return (
+                        <div key={p.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                          <p className="font-semibold text-slate-800 mb-1">
+                            {idx + 1}. {p.enunciado}
+                          </p>
+                          <div className="text-indigo-900 font-bold bg-white p-2 rounded border border-slate-200">
+                            {resposta !== undefined && resposta !== '' ? String(resposta) : <span className="text-slate-400 italic">Não respondida</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setDetalheResposta(null)}
+                      className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        `;
-      }).join('');
-    }
-
-    function setRating(perguntaId, val) {
-      document.getElementById('input_' + perguntaId).value = val;
-      const group = document.getElementById('rating_' + perguntaId);
-      group.querySelectorAll('.rating-btn').forEach((btn, idx) => {
-        if (idx + 1 === val) btn.classList.add('active');
-        else btn.classList.remove('active');
-      });
-      document.getElementById('box_' + perguntaId)?.classList.add('answered');
-    }
-
-    async function enviarRespostasProfessor(e) {
-      e.preventDefault();
-      const form = e.target;
-      const formData = new FormData(form);
-      const perguntas = await getAllStore('perguntas');
-
-      const respostasObj = {};
-
-      for (let p of perguntas) {
-        const val = formData.get(`pergunta_${p.id}`);
-        if (p.obrigatoria && (val === null || val === '')) {
-          alert(`Por favor, responda a pergunta: "${p.enunciado}"`);
-          return;
-        }
-        if (val !== null && val !== '') {
-          respostasObj[p.id] = val;
-        }
+        );
       }
 
-      const envio = {
-        id: 'resp-' + Date.now(),
-        professorNome: currentUser.nome,
-        salaId: currentUser.salaId,
-        salaNome: currentUser.salaNome,
-        turmaId: currentUser.turmaId,
-        turmaNome: currentUser.turmaNome,
-        respostas: respostasObj,
-        timestamp: Date.now()
-      };
-
-      await saveStore('respostas', envio);
-      form.reset();
-      document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.question-box').forEach(b => b.classList.remove('answered'));
-
-      alert('Obrigado! Suas respostas foram salvas com sucesso no banco de dados!');
-      showToast('Respostas gravadas no IndexedDB!');
-    }
-
-    // Inicialização ao carregar a página
-    window.addEventListener('DOMContentLoaded', async () => {
-      await initDB();
-    });
-  </script>
-</body>
+      // Renderização na div#root
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        ReactDOM.createRoot(rootElement).render(<App />);
+      }
+    </script>
+  </body>
 </html>

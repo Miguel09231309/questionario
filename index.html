@@ -491,6 +491,12 @@
         </svg>
       );
 
+      const IconEdit = ({ className = "w-4 h-4" }) => (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+        </svg>
+      );
+
       // Função utilitária para baixar este próprio arquivo HTML
       function baixarArquivoHtmlAtual() {
         const conteudo = "<!doctype html>\n" + document.documentElement.outerHTML;
@@ -561,13 +567,21 @@
           } catch {}
         };
 
-        // Respostas
+        // Respostas: atualiza se já existir para este professor e turma, ou cria novo
         const handleSalvarResposta = async (respostaData) => {
           const now = Date.now();
+          const listaAtual = await db.getAll('respostas');
+          const existente = listaAtual.find((r) =>
+            r.professorNome?.toLowerCase().trim() === respostaData.professorNome?.toLowerCase().trim() &&
+            r.turmaId === respostaData.turmaId &&
+            r.salaId === respostaData.salaId
+          );
+
           const nova = {
             ...respostaData,
-            id: 'resp-' + now,
-            criadaEm: new Date(now).toISOString(),
+            id: existente ? existente.id : ('resp-' + now),
+            criadaEm: existente ? existente.criadaEm : new Date(now).toISOString(),
+            atualizadaEm: new Date(now).toISOString(),
             timestamp: now,
           };
           await db.putItem('respostas', nova);
@@ -831,6 +845,7 @@
                 <ViewProfessor
                   session={session}
                   perguntas={perguntas}
+                  respostas={respostas}
                   salas={salas}
                   turmas={turmas}
                   onSalvarResposta={handleSalvarResposta}
@@ -1103,35 +1118,133 @@
       }
 
       // ==========================================
-      // VIEW: PROFESSOR (QUESTIONÁRIO)
+      // VIEW: PROFESSOR (QUESTIONÁRIO COM AUTO-SAVE E NÃO PRECISAR RESPONDER NOVAMENTE)
       // ==========================================
-      function ViewProfessor({ session, perguntas, salas, turmas, onSalvarResposta, onChangeSalaTurma }) {
-        const [respostasState, setRespostasState] = useState({});
+      function ViewProfessor({ session, perguntas, respostas, salas, turmas, onSalvarResposta, onChangeSalaTurma }) {
+        // Verifica se já existe uma resposta salva para este professor nesta sala e turma específica
+        const respostaExistente = useMemo(() => {
+          return (respostas || []).find((r) =>
+            r.professorNome?.toLowerCase().trim() === session.nome?.toLowerCase().trim() &&
+            r.turmaId === session.turmaId &&
+            r.salaId === session.salaId
+          );
+        }, [respostas, session.nome, session.turmaId, session.salaId]);
+
+        // Mapeamento de status de cada turma para este professor (para exibir no seletor de turmas)
+        const statusTurmas = useMemo(() => {
+          const map = {};
+          (turmas || []).forEach((t) => {
+            const resp = (respostas || []).find((r) =>
+              r.professorNome?.toLowerCase().trim() === session.nome?.toLowerCase().trim() &&
+              r.turmaId === t.id
+            );
+            map[t.id] = resp ? { respondida: true, data: resp.criadaEm } : { respondida: false };
+          });
+          return map;
+        }, [respostas, session.nome, turmas]);
+
+        const [modoEdicao, setModoEdicao] = useState(false);
+        const [respostasState, setRespostasState] = useState(() => {
+          return respostaExistente ? { ...respostaExistente.respostas } : {};
+        });
         const [isSubmitting, setIsSubmitting] = useState(false);
-        const [showSuccessCard, setShowSuccessCard] = useState(false);
+        const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
         const [showModalTroca, setShowModalTroca] = useState(false);
 
         const [tempSalaId, setTempSalaId] = useState(session.salaId || salas[0]?.id || '');
         const [tempTurmaId, setTempTurmaId] = useState(session.turmaId || turmas[0]?.id || '');
+        const autoSaveTriggeredRef = useRef(false);
+
+        // Quando troca de turma/sala ou a resposta existente muda, sincroniza o estado
+        useEffect(() => {
+          if (respostaExistente) {
+            setRespostasState({ ...respostaExistente.respostas });
+            setModoEdicao(false);
+          } else {
+            setRespostasState({});
+            setModoEdicao(false);
+          }
+          autoSaveTriggeredRef.current = false;
+          setAutoSaveStatus('idle');
+          setTempSalaId(session.salaId || salas[0]?.id || '');
+          setTempTurmaId(session.turmaId || turmas[0]?.id || '');
+        }, [session.salaId, session.turmaId, respostaExistente?.id]);
 
         const ativas = perguntas.filter((p) => p.ativa);
         const totalPerguntas = ativas.length;
         const respondidas = ativas.filter((p) => {
           const val = respostasState[p.id];
-          return val !== undefined && val !== '';
+          return val !== undefined && val !== '' && String(val).trim() !== '';
         }).length;
         const percentual = totalPerguntas > 0 ? Math.round((respondidas / totalPerguntas) * 100) : 0;
+
+        // Todas as obrigatórias foram respondidas?
+        const todasObrigatoriasRespondidas = useMemo(() => {
+          if (ativas.length === 0) return false;
+          return ativas.every((p) => {
+            if (!p.obrigatoria) return true;
+            const val = respostasState[p.id];
+            return val !== undefined && val !== '' && String(val).trim() !== '';
+          });
+        }, [ativas, respostasState]);
 
         const handleSetValor = (pId, val) => {
           setRespostasState((prev) => ({ ...prev, [pId]: val }));
         };
 
-        const handleSubmit = async (e) => {
+        // AUTO-SAVE: Quando todas as perguntas obrigatórias são respondidas, salva automaticamente!
+        useEffect(() => {
+          // Se não terminou ainda, limpa o flag
+          if (!todasObrigatoriasRespondidas) {
+            autoSaveTriggeredRef.current = false;
+            return;
+          }
+
+          // Se já existe e não estamos ativamente editando, não precisa auto-salvar
+          if (respostaExistente && !modoEdicao) {
+            return;
+          }
+
+          // Evita salvar repetidamente enquanto já está processando
+          if (autoSaveTriggeredRef.current || isSubmitting) {
+            return;
+          }
+
+          // Dispara auto-save com debounce de 600ms para o professor ver visualmente sua seleção
+          setAutoSaveStatus('saving');
+          const timer = setTimeout(async () => {
+            autoSaveTriggeredRef.current = true;
+            setIsSubmitting(true);
+            try {
+              await onSalvarResposta({
+                professorNome: session.nome,
+                salaId: session.salaId || 'sala-geral',
+                salaNome: session.salaNome || 'Sala Principal',
+                turmaId: session.turmaId || 'turma-geral',
+                turmaNome: session.turmaNome || 'Turma Principal',
+                respostas: respostasState,
+              });
+              setAutoSaveStatus('saved');
+              setModoEdicao(false);
+              setTimeout(() => setAutoSaveStatus('idle'), 4000);
+            } catch (err) {
+              console.error('Erro ao auto-salvar respostas:', err);
+              setAutoSaveStatus('idle');
+              autoSaveTriggeredRef.current = false;
+            } finally {
+              setIsSubmitting(false);
+            }
+          }, 600);
+
+          return () => clearTimeout(timer);
+        }, [todasObrigatoriasRespondidas, respostasState, session, respostaExistente, modoEdicao, isSubmitting]);
+
+        const handleSubmitManual = async (e) => {
           e.preventDefault();
           for (const p of ativas) {
             if (p.obrigatoria) {
               const val = respostasState[p.id];
-              if (val === undefined || val === '') {
+              if (val === undefined || val === '' || String(val).trim() === '') {
                 alert(`Por favor, responda a pergunta obrigatória:\n"${p.enunciado}"`);
                 return;
               }
@@ -1148,8 +1261,9 @@
               turmaNome: session.turmaNome || 'Turma Principal',
               respostas: respostasState,
             });
-            setShowSuccessCard(true);
-            setRespostasState({});
+            setAutoSaveStatus('saved');
+            setModoEdicao(false);
+            setTimeout(() => setAutoSaveStatus('idle'), 4000);
           } finally {
             setIsSubmitting(false);
           }
@@ -1162,31 +1276,163 @@
           setShowModalTroca(false);
         };
 
-        if (showSuccessCard) {
-          return (
-            <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-              <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
-                  <IconCheck className="w-8 h-8" />
-                </div>
-                <h2 className="text-2xl font-extrabold text-slate-900">Avaliação Salva com Sucesso!</h2>
-                <p className="text-slate-600 text-sm mt-2 max-w-md mx-auto">
-                  Suas respostas para a <strong>{session.salaNome}</strong> e turma <strong>{session.turmaNome}</strong> foram gravadas diretamente no banco de dados IndexedDB local.
-                </p>
+        // ==============================================================
+        // ESTADO 1: QUESTIONÁRIO JÁ RESPONDIDO E SALVO (NÃO PRECISA RESPONDER DE NOVO)
+        // ==============================================================
+        if (respostaExistente && !modoEdicao) {
+          const dataEnvioFormatada = new Date(respostaExistente.timestamp || respostaExistente.criadaEm).toLocaleString('pt-BR');
 
-                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          return (
+            <div className="max-w-4xl mx-auto px-4 py-8">
+              {/* Notificação toast de auto-salvo */}
+              {autoSaveStatus === 'saved' && (
+                <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center gap-3 shadow-xs animate-bounce">
+                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <IconCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm">Avaliação salva automaticamente!</h4>
+                    <p className="text-xs text-emerald-700">
+                      Suas respostas foram gravadas com sucesso no banco de dados local IndexedDB.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Card Principal: Questionário Concluído */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <IconCheck className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider mb-1">
+                        Avaliação Concluída
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                        Você já respondeu o questionário desta turma!
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                        Turma: <strong className="text-slate-800">{session.turmaNome}</strong> &bull; Sala: <strong className="text-slate-800">{session.salaNome}</strong> &bull; Respondido em <span className="font-mono">{dataEnvioFormatada}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setShowModalTroca(true)}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                    >
+                      <IconUsers className="w-4 h-4" />
+                      <span>Avaliar Outra Turma</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModoEdicao(true)}
+                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 transition-colors cursor-pointer"
+                      title="Editar ou atualizar as respostas desta turma"
+                    >
+                      <IconEdit className="w-3.5 h-3.5" />
+                      <span>Editar Respostas</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 flex items-center justify-between">
+                  <span>
+                    🎉 <strong>Não é necessário responder novamente.</strong> Seus dados já estão computados e consolidados nos relatórios da escola.
+                  </span>
+                  <span className="hidden md:inline font-mono text-[11px] text-slate-400">IndexedDB ID: {respostaExistente.id}</span>
+                </div>
+              </div>
+
+              {/* Resumo das Respostas Salvas */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">
+                    Resumo das Suas Respostas Registradas ({session.turmaNome})
+                  </h3>
+                  <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                    {Object.keys(respostaExistente.respostas || {}).length} Itens Respondidos
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {ativas.map((p, idx) => {
+                    const resp = respostaExistente.respostas[p.id];
+                    return (
+                      <div key={p.id} className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 text-xs">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-bold text-slate-800">
+                            {idx + 1}. {p.enunciado}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0 ${
+                            p.categoria === 'sala' ? 'bg-blue-100 text-blue-800' : p.categoria === 'turma' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {p.categoria === 'sala' ? 'Sala' : p.categoria === 'turma' ? 'Turma' : 'Geral'}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 font-bold">
+                          {p.tipo === 'escala' ? (
+                            <span className="flex items-center gap-1.5 text-indigo-700">
+                              <span>Nota: {resp} / 5</span>
+                              <span className="flex">
+                                {[1, 2, 3, 4, 5].map((n) => (
+                                  <IconStar
+                                    key={n}
+                                    className={`w-3.5 h-3.5 ${n <= Number(resp) ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`}
+                                    filled={n <= Number(resp)}
+                                  />
+                                ))}
+                              </span>
+                            </span>
+                          ) : (
+                            <span>{resp !== undefined && resp !== '' ? String(resp) : <em className="text-slate-400 font-normal">Sem resposta</em>}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <span className="text-xs text-slate-500">
+                    Deseja registrar a avaliação de outra turma que você leciona?
+                  </span>
                   <button
-                    onClick={() => setShowSuccessCard(false)}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg transition-colors cursor-pointer"
+                    type="button"
+                    onClick={() => setShowModalTroca(true)}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
-                    Responder para outra Sala/Turma
+                    Selecionar Outra Turma &rarr;
                   </button>
                 </div>
               </div>
+
+              {/* Modal de Troca de Turma */}
+              {showModalTroca && (
+                <ModalTrocaSalaTurma
+                  salas={salas}
+                  turmas={turmas}
+                  statusTurmas={statusTurmas}
+                  tempSalaId={tempSalaId}
+                  setTempSalaId={setTempSalaId}
+                  tempTurmaId={tempTurmaId}
+                  setTempTurmaId={setTempTurmaId}
+                  onConfirm={handleConfirmarTroca}
+                  onClose={() => setShowModalTroca(false)}
+                />
+              )}
             </div>
           );
         }
 
+        // ==============================================================
+        // ESTADO 2: PREENCHIMENTO DO QUESTIONÁRIO (COM AUTO-SAVE AO CONCLUIR)
+        // ==============================================================
         return (
           <div className="max-w-4xl mx-auto px-4 py-8">
             {/* Barra de identificação da aula */}
@@ -1204,37 +1450,88 @@
                     <IconUsers className="w-3.5 h-3.5 text-emerald-600" />
                     {session.turmaNome || 'Turma Padrão'}
                   </span>
+                  {modoEdicao && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800">
+                      <IconEdit className="w-3 h-3" />
+                      Modo de Edição Ativo
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowModalTroca(true)}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition-colors cursor-pointer"
-              >
-                Trocar Sala ou Turma
-              </button>
+              <div className="flex items-center gap-2">
+                {modoEdicao && (
+                  <button
+                    type="button"
+                    onClick={() => setModoEdicao(false)}
+                    className="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Cancelar Edição
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowModalTroca(true)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition-colors cursor-pointer"
+                >
+                  Trocar Turma / Sala
+                </button>
+              </div>
             </div>
+
+            {/* Banner de Salvamento Automático */}
+            {autoSaveStatus === 'saving' && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6 flex items-center gap-3 text-indigo-900 shadow-xs animate-pulse">
+                <div className="w-6 h-6 border-3 border-indigo-300 border-t-indigo-600 rounded-full animate-spin shrink-0"></div>
+                <div>
+                  <span className="font-bold text-xs block">Salvando automaticamente...</span>
+                  <span className="text-[11px] text-indigo-700">
+                    Todas as perguntas foram respondidas. Gravando suas avaliações no banco de dados local.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {autoSaveStatus === 'saved' && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 flex items-center gap-3 text-emerald-900 shadow-xs">
+                <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <IconCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-xs block">Salvo automaticamente com sucesso!</span>
+                  <span className="text-[11px] text-emerald-700">
+                    Suas respostas foram gravadas e você não precisa responder novamente.
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Barra de progresso */}
             <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs mb-6">
               <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
-                <span>Progresso das Respostas: {respondidas} de {totalPerguntas} concluídas</span>
-                <span className="text-indigo-600 font-bold">{percentual}%</span>
+                <span>Progresso: {respondidas} de {totalPerguntas} respondidas</span>
+                <span className={`font-bold ${todasObrigatoriasRespondidas ? 'text-emerald-600' : 'text-indigo-600'}`}>
+                  {percentual}% {todasObrigatoriasRespondidas && '(Completo &bull; Salva Automaticamente)'}
+                </span>
               </div>
               <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                 <div
-                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                  className={`h-2.5 rounded-full transition-all duration-300 ${
+                    todasObrigatoriasRespondidas ? 'bg-emerald-500' : 'bg-indigo-600'
+                  }`}
                   style={{ width: `${percentual}%` }}
                 ></div>
               </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                💡 Dica: Ao terminar de preencher a última pergunta, o questionário <strong>salva automaticamente</strong> no banco de dados.
+              </p>
             </div>
 
             {/* Formulário com as perguntas */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmitManual} className="space-y-5">
               {ativas.map((p, idx) => {
                 const valorAtual = respostasState[p.id];
-                const preenchida = valorAtual !== undefined && valorAtual !== '';
+                const preenchida = valorAtual !== undefined && valorAtual !== '' && String(valorAtual).trim() !== '';
 
                 return (
                   <div
@@ -1247,8 +1544,10 @@
                   >
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
-                          {idx + 1}
+                        <span className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${
+                          preenchida ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {preenchida ? '✓' : idx + 1}
                         </span>
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide ${
                           p.categoria === 'sala'
@@ -1276,7 +1575,7 @@
                       <div>
                         <div className="grid grid-cols-5 gap-2 sm:gap-3 max-w-md">
                           {[1, 2, 3, 4, 5].map((num) => {
-                            const isSelected = valorAtual === num;
+                            const isSelected = Number(valorAtual) === num;
                             return (
                               <button
                                 key={num}
@@ -1284,7 +1583,7 @@
                                 onClick={() => handleSetValor(p.id, num)}
                                 className={`py-3 px-2 rounded-xl font-bold text-sm border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                                   isSelected
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-300'
                                     : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                                 }`}
                               >
@@ -1313,7 +1612,7 @@
                               onClick={() => handleSetValor(p.id, opt)}
                               className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-sm border flex items-center justify-center gap-2 transition-all cursor-pointer ${
                                 isSelected
-                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-300'
                                   : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                               }`}
                             >
@@ -1339,7 +1638,7 @@
                               onClick={() => handleSetValor(p.id, opt)}
                               className={`flex items-center gap-3 p-3 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
                                 isSelected
-                                  ? 'bg-indigo-50/70 border-indigo-400 text-indigo-950 font-semibold'
+                                  ? 'bg-indigo-50/70 border-indigo-400 text-indigo-950 font-semibold ring-1 ring-indigo-200'
                                   : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
                               }`}
                             >
@@ -1377,11 +1676,15 @@
                   className="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-base rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSubmitting ? (
-                    <span>Gravando no Banco IndexedDB...</span>
+                    <span>Salvando automaticamente no banco IndexedDB...</span>
+                  ) : todasObrigatoriasRespondidas ? (
+                    <>
+                      <span>Salvar / Confirmar Avaliação</span>
+                      <IconCheck className="w-5 h-5" />
+                    </>
                   ) : (
                     <>
-                      <span>Concluir e Enviar Avaliação</span>
-                      <IconCheck className="w-5 h-5" />
+                      <span>Responda todas as obrigatórias ({respondidas}/{totalPerguntas})</span>
                     </>
                   )}
                 </button>
@@ -1390,57 +1693,116 @@
 
             {/* Modal de Troca de Sala / Turma */}
             {showModalTroca && (
-              <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200">
-                  <h3 className="text-lg font-bold text-slate-900 mb-1">Trocar Sala ou Turma</h3>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Atualize o local ou a turma sem precisar reiniciar sua sessão.
-                  </p>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sala:</label>
-                      <select
-                        value={tempSalaId}
-                        onChange={(e) => setTempSalaId(e.target.value)}
-                        className="w-full p-2.5 text-sm border border-slate-300 rounded-lg bg-slate-50"
+              <ModalTrocaSalaTurma
+                salas={salas}
+                turmas={turmas}
+                statusTurmas={statusTurmas}
+                tempSalaId={tempSalaId}
+                setTempSalaId={setTempSalaId}
+                tempTurmaId={tempTurmaId}
+                setTempTurmaId={setTempTurmaId}
+                onConfirm={handleConfirmarTroca}
+                onClose={() => setShowModalTroca(false)}
+              />
+            )}
+          </div>
+        );
+      }
+
+      // Componente Modal de Seleção de Turma com Indicador de Status
+      function ModalTrocaSalaTurma({
+        salas,
+        turmas,
+        statusTurmas,
+        tempSalaId,
+        setTempSalaId,
+        tempTurmaId,
+        setTempTurmaId,
+        onConfirm,
+        onClose,
+      }) {
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Selecionar Turma & Sala</h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Veja abaixo quais turmas você já avaliou e escolha a próxima para responder.
+              </p>
+
+              {/* Status das Turmas */}
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-700 mb-2">Suas Turmas Atribuídas:</label>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {turmas.map((t) => {
+                    const status = statusTurmas[t.id];
+                    const isSelected = tempTurmaId === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setTempTurmaId(t.id)}
+                        className={`p-2.5 rounded-xl border text-xs flex items-center justify-between cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-indigo-600 bg-indigo-50/70 font-bold'
+                            : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                        }`}
                       >
-                        {salas.map((s) => (
-                          <option key={s.id} value={s.id}>{s.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Turma:</label>
-                      <select
-                        value={tempTurmaId}
-                        onChange={(e) => setTempTurmaId(e.target.value)}
-                        className="w-full p-2.5 text-sm border border-slate-300 rounded-lg bg-slate-50"
-                      >
-                        {turmas.map((t) => (
-                          <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end mt-6">
-                    <button
-                      type="button"
-                      onClick={() => setShowModalTroca(false)}
-                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmarTroca}
-                      className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer"
-                    >
-                      Confirmar Troca
-                    </button>
-                  </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="radioTurma"
+                            checked={isSelected}
+                            onChange={() => setTempTurmaId(t.id)}
+                            className="text-indigo-600"
+                          />
+                          <span>{t.nome} <span className="text-slate-400 font-normal">({t.turno})</span></span>
+                        </div>
+                        {status?.respondida ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            ✓ Já Respondida
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                            ⏳ Pendente
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            )}
+
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Sala de Aula Utilizada:</label>
+                  <select
+                    value={tempSalaId}
+                    onChange={(e) => setTempSalaId(e.target.value)}
+                    className="w-full p-2.5 text-xs border border-slate-300 rounded-lg bg-slate-50"
+                  >
+                    {salas.map((s) => (
+                      <option key={s.id} value={s.id}>{s.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end mt-6 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={onConfirm}
+                  className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg cursor-pointer shadow-xs"
+                >
+                  Confirmar Seleção
+                </button>
+              </div>
+            </div>
           </div>
         );
       }
